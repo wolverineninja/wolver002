@@ -177,6 +177,10 @@
         <button onclick="sendCmd()">send</button>
       </div>
     </div>
+    <div id="bl-section" style="display:none;margin-top:20px;font-size:12px;color:var(--muted)">
+      <strong style="color:var(--red)">Blocked commands:</strong>
+      <span id="bl-list"></span>
+    </div>
   </main>
 
   <div class="popup-overlay" id="popup">
@@ -331,6 +335,12 @@
           bar.classList.remove("show");
         }
         if (data.theme) applyTheme(data.theme);
+        if (data.blacklist && data.blacklist.length) {
+          document.getElementById("bl-section").style.display = "block";
+          document.getElementById("bl-list").textContent = data.blacklist.join(", ");
+        } else {
+          document.getElementById("bl-section").style.display = "none";
+        }
       }).catch(function() {});
     }
 
