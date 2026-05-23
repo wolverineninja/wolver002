@@ -67,6 +67,35 @@
       font-size: 15px;
       line-height: 1.8;
     }
+    .switcher {
+      display: flex;
+      gap: 0;
+      margin-bottom: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      width: fit-content;
+    }
+    .switcher button {
+      padding: 8px 18px;
+      background: var(--card);
+      border: none;
+      color: var(--muted);
+      font: inherit;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background 160ms ease, color 160ms ease;
+    }
+    .switcher button:not(:last-child) {
+      border-right: 1px solid var(--line);
+    }
+    .switcher button.active {
+      background: #1f1f23;
+      color: var(--fg);
+    }
+    .switcher button:hover:not(.active) {
+      background: #131318;
+    }
   </style>
 </head>
 <body>
@@ -84,12 +113,26 @@
       <li>1 Hit Kill</li>
     </ul>
 
+    <div class="switcher">
+      <button class="active" onclick="switchVideo(0)">Clip 1</button>
+      <button onclick="switchVideo(1)">Clip 2</button>
+    </div>
+
     <div class="video-wrap">
-      <video controls preload="metadata" playsinline>
+      <video id="player" controls preload="metadata" playsinline>
         <source src="/videos/factionsvr.mp4" type="video/mp4" />
-        Your browser doesn't support embedded video. <a href="/videos/factionsvr.mp4">Download the clip.</a>
       </video>
     </div>
   </main>
+  <script>
+    var sources = ["/videos/factionsvr.mp4", "/videos/factionsvr2.mp4"];
+    function switchVideo(i) {
+      var v = document.getElementById("player");
+      var btns = document.querySelectorAll(".switcher button");
+      btns.forEach(function(b, idx) { b.classList.toggle("active", idx === i); });
+      v.src = sources[i];
+      v.load();
+    }
+  </script>
 </body>
 </html>
