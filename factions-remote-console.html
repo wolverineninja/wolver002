@@ -101,6 +101,31 @@
       transition: background 120ms;
     }
     .input-row button:hover { background: #1a1a1e; }
+    .mic-btn { color: var(--muted); }
+    .mic-btn.active {
+      color: var(--red);
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .jarvis-bar {
+      display: none;
+      padding: 8px 16px;
+      border-top: 1px solid var(--line);
+      font-size: 12px;
+      color: var(--muted);
+      background: rgba(239,68,68,0.05);
+    }
+    .jarvis-bar.show { display: flex; align-items: center; gap: 8px; }
+    .jarvis-bar .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--red);
+      animation: pulse 1.5s infinite;
+    }
     .popup-overlay {
       display: none;
       position: fixed;
@@ -175,6 +200,11 @@
       <div class="input-row">
         <input type="text" id="cmd" placeholder="/help" autocomplete="off" spellcheck="false" />
         <button onclick="sendCmd()">send</button>
+        <button class="mic-btn" id="mic-btn" onclick="toggleJarvis()" title="Jarvis Mode">&#127908;</button>
+      </div>
+      <div class="jarvis-bar" id="jarvis-bar">
+        <span class="dot"></span>
+        <span id="jarvis-status">Listening...</span>
       </div>
     </div>
     <div id="bl-section" style="display:none;margin-top:20px;font-size:12px;color:var(--muted)">
@@ -346,6 +376,89 @@
 
     setInterval(pollAdmin, 2000);
     pollAdmin();
+
+    var jarvisOn = false;
+    var recognition = null;
+    var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    function toggleJarvis() {
+      if (!SpeechRec) {
+        addLog("Speech recognition not supported in this browser", "error");
+        return;
+      }
+      jarvisOn = !jarvisOn;
+      var btn = document.getElementById("mic-btn");
+      var bar = document.getElementById("jarvis-bar");
+      if (jarvisOn) {
+        btn.classList.add("active");
+        bar.classList.add("show");
+        startListening();
+        addLog("Jarvis mode ON", "sent");
+      } else {
+        btn.classList.remove("active");
+        bar.classList.remove("show");
+        if (recognition) recognition.stop();
+        addLog("Jarvis mode OFF", "");
+      }
+    }
+
+    function startListening() {
+      if (!jarvisOn) return;
+      recognition = new SpeechRec();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = "en-US";
+
+      recognition.onresult = function(e) {
+        var final = "";
+        var interim = "";
+        for (var i = e.resultIndex; i < e.results.length; i++) {
+          if (e.results[i].isFinal) {
+            final += e.results[i][0].transcript;
+          } else {
+            interim += e.results[i][0].transcript;
+          }
+        }
+        if (interim) {
+          document.getElementById("jarvis-status").textContent = interim;
+        }
+        if (final) {
+          var cmd = final.trim();
+          document.getElementById("jarvis-status").textContent = "Heard: " + cmd;
+          if (cmd) {
+            if (!cmd.startsWith("/")) cmd = "/" + cmd.replace(/\s+/g, "_");
+            addLog("$ " + cmd + " (voice)", "sent");
+            fetch(SERVER, { method: "POST", body: cmd }).then(function(r) {
+              if (r.ok) {
+                count++;
+                document.getElementById("count").textContent = count + " command" + (count === 1 ? "" : "s") + " sent";
+              } else if (r.status === 403) {
+                r.json().then(function(d) {
+                  addLog(d.error || "Command blocked by admin", "error");
+                }).catch(function() { addLog("Command blocked", "error"); });
+              }
+            }).catch(function() { addLog("Server offline", "error"); });
+          }
+          setTimeout(function() {
+            if (jarvisOn) document.getElementById("jarvis-status").textContent = "Listening...";
+          }, 2000);
+        }
+      };
+
+      recognition.onerror = function(e) {
+        if (e.error === "no-speech") return;
+        if (e.error === "aborted") return;
+        addLog("Mic error: " + e.error, "error");
+      };
+
+      recognition.onend = function() {
+        if (jarvisOn) {
+          setTimeout(startListening, 300);
+        }
+      };
+
+      recognition.start();
+    }
   </script>
 </body>
 </html>
