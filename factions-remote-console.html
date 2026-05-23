@@ -160,7 +160,7 @@
     </div>
   </main>
   <script>
-    var TOPIC = "wolver002-factions-" + "cmd-v1";
+    var SERVER = "http://localhost:8787";
     var count = 0;
     var input = document.getElementById("cmd");
     var log = document.getElementById("log");
@@ -187,7 +187,7 @@
       if (!cmd) return;
       input.value = "";
 
-      fetch("https://ntfy.sh/" + TOPIC, {
+      fetch(SERVER, {
         method: "POST",
         body: cmd
       }).then(function(r) {
@@ -199,7 +199,7 @@
           addLog("Failed to send: " + cmd, "error");
         }
       }).catch(function(e) {
-        addLog("Error: " + e.message, "error");
+        addLog("Server offline — run 6_remote_console.bat first", "error");
       });
     }
   </script>
