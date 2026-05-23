@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "wolver002 secret",
+  "version": "1.0.0",
+  "description": "Click to capture the current page and get an AI answer in the corner.",
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": ["https://api.wolver002.com/*"],
+  "action": {
+    "default_title": "Ask AI about this page"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
+  }
+}

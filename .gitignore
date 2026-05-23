@@ -1,0 +1,17 @@
+# Wrangler local cache / state
+api/.wrangler/
+**/.wrangler/
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# Node (in case anything pulls deps later)
+node_modules/
