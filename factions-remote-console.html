@@ -288,7 +288,9 @@
           document.getElementById("count").textContent = count + " command" + (count === 1 ? "" : "s") + " sent";
           addLog("$ " + cmd, "sent");
         } else if (r.status === 403) {
-          addLog("Commands are paused by admin", "error");
+          r.json().then(function(d) {
+            addLog(d.error || "Command blocked by admin", "error");
+          }).catch(function() { addLog("Command blocked by admin", "error"); });
         } else {
           addLog("Failed to send: " + cmd, "error");
         }
