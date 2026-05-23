@@ -14,6 +14,7 @@
       --card: #111114;
       --green: #22c55e;
       --red: #ef4444;
+      --accent: #22c55e;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -48,21 +49,6 @@
       font-size: 14px;
       margin-bottom: 32px;
     }
-    .status {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 13px;
-      color: var(--muted);
-      margin-bottom: 24px;
-    }
-    .status .dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--red);
-    }
-    .status .dot.online { background: var(--green); }
     .console {
       background: var(--card);
       border: 1px solid var(--line);
@@ -85,7 +71,7 @@
       line-height: 1.7;
     }
     .log .entry { color: var(--muted); }
-    .log .entry.sent { color: var(--green); }
+    .log .entry.sent { color: var(--accent); }
     .log .entry.error { color: var(--red); }
     .log .entry .time { color: #555; margin-right: 8px; }
     .input-row {
@@ -108,25 +94,13 @@
       background: transparent;
       border: none;
       border-left: 1px solid var(--line);
-      color: var(--green);
+      color: var(--accent);
       font: inherit;
       font-size: 14px;
       cursor: pointer;
       transition: background 120ms;
     }
     .input-row button:hover { background: #1a1a1e; }
-    .help {
-      margin-top: 24px;
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.8;
-    }
-    .help code {
-      background: var(--card);
-      padding: 2px 6px;
-      border-radius: 4px;
-      border: 1px solid var(--line);
-    }
     .popup-overlay {
       display: none;
       position: fixed;
@@ -186,7 +160,7 @@
 </head>
 <body>
   <main>
-    <a class="back" href="/moding">← back</a>
+    <a class="back" href="/moding">&#8592; back</a>
     <h1 style="font-family: ui-sans-serif, system-ui, sans-serif;">Factions Remote Console</h1>
     <p class="subtitle"></p>
 
@@ -203,17 +177,8 @@
         <button onclick="sendCmd()">send</button>
       </div>
     </div>
-
-    <div class="help">
-      <strong>Commands:</strong><br>
-      <code>/help</code> list commands &nbsp;
-      <code>/time set 6000</code> daytime &nbsp;
-      <code>/drop iron_sword</code> drop item<br>
-      <code>/tp player1 player2</code> teleport &nbsp;
-      <code>/kill player</code> &nbsp;
-      <code>/god player</code> toggle god
-    </div>
   </main>
+
   <div class="popup-overlay" id="popup">
     <div class="popup-box">
       <div class="popup-msg" id="popup-msg"></div>
@@ -224,6 +189,7 @@
     <div class="timer-time" id="timer-time">00:00</div>
     <div class="timer-label" id="timer-label"></div>
   </div>
+
   <script>
     var SERVER = "https://admin.wolver002.com";
     var count = 0;
@@ -231,6 +197,65 @@
     var log = document.getElementById("log");
     var lastPopupId = 0;
     var popupTimeout = null;
+    var audioCtx = null;
+
+    var themes = {
+      default: { bg: "#0b0b0c", fg: "#e8e8ea", muted: "#8a8a92", line: "#1f1f23", card: "#111114", accent: "#22c55e" },
+      red:     { bg: "#0c0808", fg: "#e8e8ea", muted: "#8a8a92", line: "#231f1f", card: "#141111", accent: "#ef4444" },
+      blue:    { bg: "#080a0c", fg: "#e8e8ea", muted: "#8a8a92", line: "#1f2123", card: "#111214", accent: "#3b82f6" },
+      green:   { bg: "#080c08", fg: "#e8e8ea", muted: "#8a8a92", line: "#1f231f", card: "#111411", accent: "#22c55e" },
+      light:   { bg: "#f0f0f2", fg: "#1a1a1e", muted: "#6a6a72", line: "#d0d0d4", card: "#ffffff", accent: "#22c55e" }
+    };
+
+    function applyTheme(name) {
+      var t = themes[name] || themes.default;
+      var r = document.documentElement.style;
+      r.setProperty("--bg", t.bg);
+      r.setProperty("--fg", t.fg);
+      r.setProperty("--muted", t.muted);
+      r.setProperty("--line", t.line);
+      r.setProperty("--card", t.card);
+      r.setProperty("--accent", t.accent);
+    }
+
+    function getAudioCtx() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === "suspended") audioCtx.resume();
+      return audioCtx;
+    }
+
+    function playSound(type) {
+      if (!type) return;
+      try {
+        var ctx = getAudioCtx();
+        var osc = ctx.createOscillator();
+        var gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        gain.gain.value = 0.25;
+
+        if (type === "ping") {
+          osc.frequency.value = 880;
+          osc.type = "sine";
+          osc.start();
+          osc.stop(ctx.currentTime + 0.15);
+        } else if (type === "alert") {
+          osc.frequency.value = 660;
+          osc.type = "square";
+          gain.gain.value = 0.15;
+          osc.start();
+          osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15);
+          osc.stop(ctx.currentTime + 0.35);
+        } else if (type === "horn") {
+          osc.frequency.value = 180;
+          osc.type = "sawtooth";
+          gain.gain.value = 0.2;
+          osc.start();
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.8);
+          osc.stop(ctx.currentTime + 0.8);
+        }
+      } catch(e) {}
+    }
 
     input.addEventListener("keydown", function(e) {
       if (e.key === "Enter") sendCmd();
@@ -267,7 +292,7 @@
         } else {
           addLog("Failed to send: " + cmd, "error");
         }
-      }).catch(function(e) {
+      }).catch(function() {
         addLog("Server offline", "error");
       });
     }
@@ -290,6 +315,7 @@
         if (data.popup && data.popup_id > lastPopupId) {
           lastPopupId = data.popup_id;
           showPopup(data.popup);
+          playSound(data.popup_sound);
         }
         var bar = document.getElementById("timerbar");
         if (data.timer > 0) {
@@ -302,6 +328,7 @@
         } else {
           bar.classList.remove("show");
         }
+        if (data.theme) applyTheme(data.theme);
       }).catch(function() {});
     }
 
