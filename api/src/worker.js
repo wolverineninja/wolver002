@@ -1,20 +1,6 @@
-// Cloudflare Worker: AI chat proxy for wolver002.com
-//
-// Default model: Llama 3.3 70B via Cloudflare Workers AI (free, no key).
-// Optional BYOK: client sends their own Anthropic key in `x-anthropic-key`
-// header to use real Claude; that key is never stored.
-//
-// Endpoints:
-//   POST /chat   { messages: [{role, content}], model?: "llama" | "claude" }
-//   GET  /health
-//
-// Workers AI binding: `AI` (configured in wrangler.toml)
-
 const ALLOW_HEADERS = "Content-Type, x-anthropic-key";
 
 function corsHeaders(origin, allowed) {
-  // Allow the configured static origin, localhost for testing,
-  // and chrome-extension:// origins (so the screenshot extension works).
   const ok =
     origin === allowed ||
     origin === "https://www.wolver002.com" ||
@@ -41,8 +27,6 @@ function json(body, init = {}, cors = {}) {
   });
 }
 
-// Very small in-memory rate limiter, per Worker isolate. Not perfect but blocks
-// the most basic abuse. For real rate limiting use a Durable Object or KV.
 const HITS = new Map();
 function rateLimit(ip, max = 20, windowMs = 60_000) {
   const now = Date.now();
@@ -53,7 +37,6 @@ function rateLimit(ip, max = 20, windowMs = 60_000) {
 }
 
 async function callLlama(ai, messages) {
-  // Workers AI accepts OpenAI-style {role, content} messages directly.
   const turns = messages.map((m) => ({
     role: m.role === "assistant" ? "assistant" : m.role === "system" ? "system" : "user",
     content: m.content,
@@ -71,7 +54,6 @@ async function callLlama(ai, messages) {
 }
 
 async function callVision(ai, dataUrl, prompt) {
-  // dataUrl: "data:image/png;base64,...."
   const commaIdx = (dataUrl || "").indexOf(",");
   if (commaIdx < 0) throw new Error("invalid_image_data_url");
   const base64 = dataUrl.slice(commaIdx + 1);
@@ -88,7 +70,6 @@ async function callVision(ai, dataUrl, prompt) {
     max_tokens: 512,
   });
 
-  // LLaVA returns { description: "..." }; other vision models use { response: "..." }
   const reply =
     out?.description ?? out?.response ?? out?.choices?.[0]?.message?.content ?? "";
   return { reply: reply.trim(), model: MODEL };
@@ -147,7 +128,6 @@ export default {
       return json({ ok: true, time: new Date().toISOString() }, {}, cors);
     }
 
-    // Vision endpoint for the Chrome extension
     if (url.pathname === "/vision" && request.method === "POST") {
       const ip =
         request.headers.get("CF-Connecting-IP") ||
@@ -165,7 +145,6 @@ export default {
       if (!body?.image) {
         return json({ error: "missing_image" }, { status: 400 }, cors);
       }
-      // Reject anything obviously oversized (data URLs balloon fast)
       if (typeof body.image !== "string" || body.image.length > 4_000_000) {
         return json({ error: "image_too_large" }, { status: 413 }, cors);
       }
@@ -204,7 +183,6 @@ export default {
     if (!messages || messages.length === 0) {
       return json({ error: "missing_messages" }, { status: 400 }, cors);
     }
-    // Cap total prompt length to prevent abuse
     const totalLen = messages.reduce((n, m) => n + (m.content?.length || 0), 0);
     if (totalLen > 12_000) {
       return json({ error: "too_long" }, { status: 413 }, cors);

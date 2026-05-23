@@ -2,15 +2,10 @@ name = "wolver002-api"
 main = "src/worker.js"
 compatibility_date = "2025-05-01"
 
-# wrangler requires at least one deploy target. We keep the route here so
-# `wrangler deploy` is happy. The api.wolver002.com Custom Domain (set up via
-# API) is what actually serves the traffic — Cloudflare handles DNS + cert
-# for that hostname automatically.
 routes = [
   { pattern = "api.wolver002.com/*", zone_name = "wolver002.com" }
 ]
 
-# Workers AI binding (free Llama 3.3 text + LLaVA vision)
 [ai]
 binding = "AI"
 

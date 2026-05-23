@@ -1,11 +1,3 @@
-// wolver002 secret extension — background service worker
-//
-// Flow on toolbar-button click:
-//   1. Show a "thinking" pill in the top-right of the current tab
-//   2. Capture a screenshot of the visible viewport
-//   3. POST the image (data URL) to https://api.wolver002.com/vision
-//   4. Replace the pill with the AI's reply (auto-dismiss after a bit, click to dismiss)
-
 const API_URL = "https://api.wolver002.com/vision";
 const DEFAULT_PROMPT =
   "Look at this screenshot. If a question is visible, answer it briefly. " +
@@ -14,7 +6,6 @@ const DEFAULT_PROMPT =
 chrome.action.onClicked.addListener(async (tab) => {
   if (!tab?.id) return;
 
-  // Some pages (chrome://, the Web Store) can't be captured or scripted.
   const url = tab.url || "";
   if (
     url.startsWith("chrome://") ||
@@ -28,10 +19,8 @@ chrome.action.onClicked.addListener(async (tab) => {
     return;
   }
 
-  // 1. Show a thinking indicator on the page
   await safeInject(tab.id, showOverlay, ["thinking…", "loading"]);
 
-  // 2. Capture the visible tab
   let dataUrl;
   try {
     dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
@@ -46,7 +35,6 @@ chrome.action.onClicked.addListener(async (tab) => {
     return;
   }
 
-  // 3. Send to the AI
   try {
     const r = await fetch(API_URL, {
       method: "POST",
@@ -77,13 +65,11 @@ async function safeInject(tabId, func, args) {
       args,
     });
   } catch (e) {
-    // Page may be a special URL we can't script — silently ignore.
     console.warn("wolver002 secret: inject failed:", e?.message || e);
   }
 }
 
-// Runs in the page context. Creates / updates / removes the floating overlay.
-function showOverlay(text, kind /* "loading" | "answer" | "error" */) {
+function showOverlay(text, kind) {
   const ID = "__wv002_secret_overlay";
   let el = document.getElementById(ID);
   if (!el) {
@@ -130,7 +116,6 @@ function showOverlay(text, kind /* "loading" | "answer" | "error" */) {
   });
   el.onclick = () => el.remove();
 
-  // Auto-dismiss after a while (only for final states, not loading)
   if (window.__wv002_timer) clearTimeout(window.__wv002_timer);
   if (kind !== "loading") {
     window.__wv002_timer = setTimeout(() => {
