@@ -108,6 +108,17 @@
       color: var(--fg);
     }
     .btn-dark:hover { background: #1a1a1e; }
+    .btn-yellow {
+      background: var(--yellow);
+      border-color: var(--yellow);
+      color: #000;
+    }
+    .btn-yellow:hover { background: #d4a107; }
+    .btn-yellow.active {
+      background: var(--red);
+      border-color: var(--red);
+      color: #fff;
+    }
     .presets {
       display: flex;
       gap: 8px;
@@ -199,7 +210,8 @@
     <div class="panel">
       <div class="panel-title">Controls</div>
       <div class="row">
-        <button class="btn-red" onclick="clearAll()">Clear All Popups & Timers</button>
+        <button class="btn-yellow" id="pause-btn" onclick="togglePause()">Pause Commands</button>
+        <button class="btn-red" onclick="clearAll()">Clear All</button>
       </div>
     </div>
 
@@ -301,6 +313,21 @@
       }, 200);
     }
 
+    function togglePause() {
+      post("/pause", "").then(function(r) { return r.json(); }).then(function(data) {
+        var btn = document.getElementById("pause-btn");
+        if (data.paused) {
+          btn.textContent = "Resume Commands";
+          btn.classList.add("active");
+          addLog("Commands PAUSED");
+        } else {
+          btn.textContent = "Pause Commands";
+          btn.classList.remove("active");
+          addLog("Commands RESUMED");
+        }
+      });
+    }
+
     function clearAll() {
       post("/clear", "").then(function() {
         addLog("Cleared all popups & timers");
@@ -321,6 +348,16 @@
         if (data && data.timer > 0 && timerEnd === 0) {
           timerEnd = Date.now() + data.timer * 1000;
           tickTimer();
+        }
+        if (data) {
+          var btn = document.getElementById("pause-btn");
+          if (data.paused) {
+            btn.textContent = "Resume Commands";
+            btn.classList.add("active");
+          } else {
+            btn.textContent = "Pause Commands";
+            btn.classList.remove("active");
+          }
         }
       }).catch(function() {
         document.getElementById("dot").classList.remove("on");

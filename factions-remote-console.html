@@ -262,6 +262,8 @@
           count++;
           document.getElementById("count").textContent = count + " command" + (count === 1 ? "" : "s") + " sent";
           addLog("$ " + cmd, "sent");
+        } else if (r.status === 403) {
+          addLog("Commands are paused by admin", "error");
         } else {
           addLog("Failed to send: " + cmd, "error");
         }
