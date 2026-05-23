@@ -189,8 +189,7 @@
 
       fetch("https://ntfy.sh/" + TOPIC, {
         method: "POST",
-        body: cmd,
-        headers: { "Title": "cmd" }
+        body: cmd
       }).then(function(r) {
         if (r.ok) {
           count++;
