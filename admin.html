@@ -72,6 +72,20 @@
       padding: 10px 14px;
       outline: none;
     }
+    select {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--fg);
+      font: inherit;
+      font-size: 13px;
+      padding: 10px 14px;
+      outline: none;
+      cursor: pointer;
+      -webkit-appearance: none;
+    }
+    select:focus { border-color: #333; }
     input:focus { border-color: #333; }
     input::placeholder { color: #444; }
     button {
@@ -190,6 +204,20 @@
         <button class="btn-blue" onclick="startTimer()">Start</button>
         <button class="btn-red" onclick="stopTimer()">Stop</button>
       </div>
+      <div class="row">
+        <select id="timer-start-action">
+          <option value="none">When started: Nothing</option>
+          <option value="pause">When started: Pause commands</option>
+          <option value="resume">When started: Resume commands</option>
+          <option value="broadcast">When started: Broadcast label</option>
+        </select>
+        <select id="timer-end-action">
+          <option value="none">When done: Nothing</option>
+          <option value="pause">When done: Pause commands</option>
+          <option value="resume">When done: Resume commands</option>
+          <option value="broadcast">When done: Broadcast "Timer done"</option>
+        </select>
+      </div>
       <div class="presets">
         <button class="btn-dark" onclick="presetTimer(30)">0:30</button>
         <button class="btn-dark" onclick="presetTimer(60)">1:00</button>
@@ -275,12 +303,33 @@
       }).catch(function() { addLog("Failed to send", "err"); });
     }
 
+    function runAction(action, label) {
+      if (action === "pause") post("/pause", "").then(function(r) { return r.json(); }).then(function(d) {
+        if (!d.paused) post("/pause", "");
+        addLog("Auto: paused commands");
+      });
+      if (action === "resume") post("/pause", "").then(function(r) { return r.json(); }).then(function(d) {
+        if (d.paused) post("/pause", "");
+        addLog("Auto: resumed commands");
+      });
+      if (action === "broadcast") {
+        var msg = label || "Timer done";
+        post("/broadcast", msg);
+        addLog("Auto: broadcast '" + msg + "'");
+      }
+    }
+
+    var timerEndAction = "none";
+
     function startTimer() {
       var sec = parseInt(document.getElementById("timer-sec").value) || 60;
       var label = document.getElementById("timer-label").value.trim();
+      var startAction = document.getElementById("timer-start-action").value;
+      timerEndAction = document.getElementById("timer-end-action").value;
       timerEnd = Date.now() + sec * 1000;
       post("/timer", { seconds: sec, label: label }).then(function() {
         addLog("Timer started: " + sec + "s" + (label ? " - " + label : ""));
+        if (startAction !== "none") runAction(startAction, label);
         tickTimer();
       }).catch(function() { addLog("Failed", "err"); });
     }
@@ -309,6 +358,10 @@
         if (left <= 0) {
           clearInterval(timerInterval);
           document.getElementById("timer-preview").textContent = "00:00";
+          if (timerEndAction !== "none") {
+            runAction(timerEndAction, "Timer done");
+            timerEndAction = "none";
+          }
         }
       }, 200);
     }
