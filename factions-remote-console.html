@@ -232,7 +232,11 @@
         <span id="jarvis-status">Listening...</span>
       </div>
     </div>
-    <div id="bl-section" style="display:none;margin-top:20px;font-size:12px;color:var(--muted)">
+    <div id="online-section" style="margin-top:20px;font-size:12px;color:var(--muted)">
+      <strong style="color:var(--accent)">Online:</strong>
+      <span id="online-list">-</span>
+    </div>
+    <div id="bl-section" style="display:none;margin-top:8px;font-size:12px;color:var(--muted)">
       <strong style="color:var(--red)">Blocked commands:</strong>
       <span id="bl-list"></span>
     </div>
@@ -386,7 +390,7 @@
     });
 
     function pollAdmin() {
-      fetch(SERVER + "/poll").then(function(r) { return r.json(); }).then(function(data) {
+      fetch(SERVER + "/poll", { headers: { "X-Username": getUsername() } }).then(function(r) { return r.json(); }).then(function(data) {
         if (data.popup && data.popup_id > lastPopupId) {
           lastPopupId = data.popup_id;
           showPopup(data.popup);
@@ -409,6 +413,11 @@
           document.getElementById("bl-list").textContent = data.blacklist.join(", ");
         } else {
           document.getElementById("bl-section").style.display = "none";
+        }
+        if (data.online && data.online.length) {
+          document.getElementById("online-list").textContent = data.online.join(", ");
+        } else {
+          document.getElementById("online-list").textContent = "-";
         }
       }).catch(function() {});
     }
