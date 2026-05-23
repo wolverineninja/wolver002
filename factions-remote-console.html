@@ -380,12 +380,65 @@
     var jarvisOn = false;
     var recognition = null;
     var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    var useServerTranscribe = !SpeechRec;
+    var micStream = null;
+    var audioProcessor = null;
+    var audioChunks = [];
+    var recCtx = null;
+
+    function sendVoiceCmd(text) {
+      var cmd = text.trim();
+      if (!cmd) return;
+      if (!cmd.startsWith("/")) cmd = "/" + cmd.replace(/\s+/g, "_");
+      addLog("$ " + cmd + " (voice)", "sent");
+      fetch(SERVER, { method: "POST", body: cmd }).then(function(r) {
+        if (r.ok) {
+          count++;
+          document.getElementById("count").textContent = count + " command" + (count === 1 ? "" : "s") + " sent";
+        } else if (r.status === 403) {
+          r.json().then(function(d) {
+            addLog(d.error || "Command blocked by admin", "error");
+          }).catch(function() { addLog("Command blocked", "error"); });
+        }
+      }).catch(function() { addLog("Server offline", "error"); });
+    }
+
+    function buildWav(samples, sampleRate) {
+      var len = samples.length;
+      var buf = new ArrayBuffer(44 + len * 2);
+      var v = new DataView(buf);
+      var s = "RIFF";
+      for (var i = 0; i < 4; i++) v.setUint8(i, s.charCodeAt(i));
+      v.setUint32(4, 36 + len * 2, true);
+      s = "WAVE";
+      for (var i = 0; i < 4; i++) v.setUint8(8 + i, s.charCodeAt(i));
+      s = "fmt ";
+      for (var i = 0; i < 4; i++) v.setUint8(12 + i, s.charCodeAt(i));
+      v.setUint32(16, 16, true);
+      v.setUint16(20, 1, true);
+      v.setUint16(22, 1, true);
+      v.setUint32(24, sampleRate, true);
+      v.setUint32(28, sampleRate * 2, true);
+      v.setUint16(32, 2, true);
+      v.setUint16(34, 16, true);
+      s = "data";
+      for (var i = 0; i < 4; i++) v.setUint8(36 + i, s.charCodeAt(i));
+      v.setUint32(40, len * 2, true);
+      for (var i = 0; i < len; i++) {
+        v.setInt16(44 + i * 2, samples[i], true);
+      }
+      return new Blob([buf], { type: "audio/wav" });
+    }
 
     function toggleJarvis() {
-      if (!SpeechRec) {
-        addLog("Speech recognition not supported in this browser", "error");
-        return;
+      if (useServerTranscribe) {
+        toggleRecording();
+      } else {
+        toggleWebSpeech();
       }
+    }
+
+    function toggleWebSpeech() {
       jarvisOn = !jarvisOn;
       var btn = document.getElementById("mic-btn");
       var bar = document.getElementById("jarvis-bar");
@@ -399,6 +452,74 @@
         bar.classList.remove("show");
         if (recognition) recognition.stop();
         addLog("Jarvis mode OFF", "");
+      }
+    }
+
+    function toggleRecording() {
+      var btn = document.getElementById("mic-btn");
+      var bar = document.getElementById("jarvis-bar");
+      if (!jarvisOn) {
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+          micStream = stream;
+          jarvisOn = true;
+          btn.classList.add("active");
+          bar.classList.add("show");
+          document.getElementById("jarvis-status").textContent = "Recording... tap mic to stop";
+          addLog("Recording...", "sent");
+          audioChunks = [];
+          recCtx = new (window.AudioContext || window.webkitAudioContext)();
+          var source = recCtx.createMediaStreamSource(stream);
+          audioProcessor = recCtx.createScriptProcessor(4096, 1, 1);
+          audioProcessor.onaudioprocess = function(e) {
+            var data = e.inputBuffer.getChannelData(0);
+            var pcm = new Int16Array(data.length);
+            for (var i = 0; i < data.length; i++) {
+              pcm[i] = Math.max(-32768, Math.min(32767, data[i] * 32767));
+            }
+            audioChunks.push(pcm);
+          };
+          source.connect(audioProcessor);
+          audioProcessor.connect(recCtx.destination);
+        }).catch(function(e) {
+          addLog("Mic access denied", "error");
+        });
+      } else {
+        jarvisOn = false;
+        btn.classList.remove("active");
+        document.getElementById("jarvis-status").textContent = "Transcribing...";
+        if (audioProcessor) audioProcessor.disconnect();
+        if (micStream) micStream.getTracks().forEach(function(t) { t.stop(); });
+        var totalLen = audioChunks.reduce(function(s, c) { return s + c.length; }, 0);
+        if (totalLen < 1600) {
+          bar.classList.remove("show");
+          addLog("Too short", "error");
+          return;
+        }
+        var merged = new Int16Array(totalLen);
+        var off = 0;
+        for (var i = 0; i < audioChunks.length; i++) {
+          merged.set(audioChunks[i], off);
+          off += audioChunks[i].length;
+        }
+        var rate = recCtx ? recCtx.sampleRate : 44100;
+        var wav = buildWav(merged, rate);
+        fetch(SERVER + "/transcribe", {
+          method: "POST",
+          body: wav,
+          headers: { "Content-Type": "audio/wav" }
+        }).then(function(r) { return r.json(); }).then(function(data) {
+          bar.classList.remove("show");
+          if (data.text) {
+            document.getElementById("jarvis-status").textContent = "Heard: " + data.text;
+            sendVoiceCmd(data.text);
+          } else {
+            addLog("Couldn't understand", "error");
+          }
+        }).catch(function() {
+          bar.classList.remove("show");
+          addLog("Transcribe failed", "error");
+        });
+        if (recCtx) recCtx.close();
       }
     }
 
@@ -423,22 +544,8 @@
           document.getElementById("jarvis-status").textContent = interim;
         }
         if (final) {
-          var cmd = final.trim();
-          document.getElementById("jarvis-status").textContent = "Heard: " + cmd;
-          if (cmd) {
-            if (!cmd.startsWith("/")) cmd = "/" + cmd.replace(/\s+/g, "_");
-            addLog("$ " + cmd + " (voice)", "sent");
-            fetch(SERVER, { method: "POST", body: cmd }).then(function(r) {
-              if (r.ok) {
-                count++;
-                document.getElementById("count").textContent = count + " command" + (count === 1 ? "" : "s") + " sent";
-              } else if (r.status === 403) {
-                r.json().then(function(d) {
-                  addLog(d.error || "Command blocked by admin", "error");
-                }).catch(function() { addLog("Command blocked", "error"); });
-              }
-            }).catch(function() { addLog("Server offline", "error"); });
-          }
+          document.getElementById("jarvis-status").textContent = "Heard: " + final.trim();
+          sendVoiceCmd(final);
           setTimeout(function() {
             if (jarvisOn) document.getElementById("jarvis-status").textContent = "Listening...";
           }, 2000);
@@ -446,15 +553,12 @@
       };
 
       recognition.onerror = function(e) {
-        if (e.error === "no-speech") return;
-        if (e.error === "aborted") return;
+        if (e.error === "no-speech" || e.error === "aborted") return;
         addLog("Mic error: " + e.error, "error");
       };
 
       recognition.onend = function() {
-        if (jarvisOn) {
-          setTimeout(startListening, 300);
-        }
+        if (jarvisOn) setTimeout(startListening, 300);
       };
 
       recognition.start();
