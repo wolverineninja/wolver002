@@ -96,6 +96,11 @@
     .switcher button:hover:not(.active) {
       background: #131318;
     }
+    .credit {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
@@ -123,15 +128,18 @@
         <source src="/videos/factionsvr.mp4" type="video/mp4" />
       </video>
     </div>
+    <p class="credit" id="credit"></p>
   </main>
   <script>
     var sources = ["/videos/factionsvr.mp4", "/videos/factionsvr2.mp4"];
+    var credits = ["", "Clip by Jonny Jonny"];
     function switchVideo(i) {
       var v = document.getElementById("player");
       var btns = document.querySelectorAll(".switcher button");
       btns.forEach(function(b, idx) { b.classList.toggle("active", idx === i); });
       v.src = sources[i];
       v.load();
+      document.getElementById("credit").textContent = credits[i];
     }
   </script>
 </body>
