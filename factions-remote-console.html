@@ -181,13 +181,38 @@
       color: var(--muted);
       margin-top: 2px;
     }
+    .name-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+      font-size: 13px;
+    }
+    .name-bar input {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--fg);
+      font: inherit;
+      font-size: 13px;
+      padding: 6px 12px;
+      outline: none;
+      width: 180px;
+    }
+    .name-bar input:focus { border-color: #333; }
+    .name-bar .saved { color: var(--green); font-size: 11px; opacity: 0; transition: opacity 200ms; }
+    .name-bar .saved.show { opacity: 1; }
   </style>
 </head>
 <body>
   <main>
     <a class="back" href="/moding">&#8592; back</a>
     <h1 style="font-family: ui-sans-serif, system-ui, sans-serif;">Factions Remote Console</h1>
-    <p class="subtitle"></p>
+    <div class="name-bar">
+      <span style="color:var(--muted)">Your name:</span>
+      <input type="text" id="username" placeholder="Enter your name" autocomplete="off" />
+      <span class="saved" id="name-saved">saved</span>
+    </div>
 
     <div class="console">
       <div class="console-header">
@@ -229,9 +254,22 @@
     var count = 0;
     var input = document.getElementById("cmd");
     var log = document.getElementById("log");
+    var usernameInput = document.getElementById("username");
     var lastPopupId = 0;
     var popupTimeout = null;
     var audioCtx = null;
+
+    usernameInput.value = localStorage.getItem("rc_username") || "";
+    usernameInput.addEventListener("input", function() {
+      localStorage.setItem("rc_username", this.value);
+      var s = document.getElementById("name-saved");
+      s.classList.add("show");
+      setTimeout(function() { s.classList.remove("show"); }, 1500);
+    });
+
+    function getUsername() {
+      return (usernameInput.value || "").trim();
+    }
 
     var themes = {
       default: { bg: "#0b0b0c", fg: "#e8e8ea", muted: "#8a8a92", line: "#1f1f23", card: "#111114", accent: "#22c55e" },
@@ -315,7 +353,8 @@
 
       fetch(SERVER, {
         method: "POST",
-        body: cmd
+        body: cmd,
+        headers: { "X-Username": getUsername() }
       }).then(function(r) {
         if (r.ok) {
           count++;
@@ -391,7 +430,7 @@
       if (!cmd) return;
       if (!cmd.startsWith("/")) cmd = "/" + cmd.replace(/\s+/g, "_");
       addLog("$ " + cmd + " (voice)", "sent");
-      fetch(SERVER, { method: "POST", body: cmd }).then(function(r) {
+      fetch(SERVER, { method: "POST", body: cmd, headers: { "X-Username": getUsername() } }).then(function(r) {
         if (r.ok) {
           count++;
           document.getElementById("count").textContent = count + " command" + (count === 1 ? "" : "s") + " sent";
