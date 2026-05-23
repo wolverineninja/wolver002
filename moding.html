@@ -67,6 +67,19 @@
       letter-spacing: 0.04em;
       margin-left: 6px;
     }
+    .video-wrap {
+      margin-top: 24px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: hidden;
+      background: #000;
+    }
+    .video-wrap video {
+      display: block;
+      width: 100%;
+      height: auto;
+      max-height: 70vh;
+    }
   </style>
 </head>
 <body>
@@ -78,6 +91,13 @@
     <button class="archive-button" type="button" disabled>
       FactionsVR<span class="archive-label">(Archived)</span>
     </button>
+
+    <div class="video-wrap">
+      <video controls preload="metadata" playsinline>
+        <source src="/videos/factionsvr.mp4" type="video/mp4" />
+        Your browser doesn't support embedded video. <a href="/videos/factionsvr.mp4">Download the clip.</a>
+      </video>
+    </div>
   </main>
 </body>
 </html>
