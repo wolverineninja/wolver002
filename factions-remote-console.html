@@ -127,6 +127,61 @@
       border-radius: 4px;
       border: 1px solid var(--line);
     }
+    .popup-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.75);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+    }
+    .popup-overlay.show { display: flex; }
+    .popup-box {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 40px 48px;
+      max-width: 520px;
+      text-align: center;
+      animation: popIn 0.25s ease;
+    }
+    @keyframes popIn {
+      from { transform: scale(0.85); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    .popup-box .popup-msg {
+      font-size: 22px;
+      font-weight: 600;
+      font-family: ui-sans-serif, system-ui, sans-serif;
+      margin-bottom: 8px;
+    }
+    .popup-box .popup-sub {
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .timer-bar {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 90;
+      text-align: center;
+      padding: 10px;
+      background: #111114ee;
+      border-bottom: 1px solid var(--line);
+      font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+    }
+    .timer-bar.show { display: block; }
+    .timer-bar .timer-time {
+      font-size: 28px;
+      color: #eab308;
+      font-weight: 700;
+    }
+    .timer-bar .timer-label {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
   </style>
 </head>
 <body>
@@ -159,11 +214,23 @@
       <code>/god player</code> toggle god
     </div>
   </main>
+  <div class="popup-overlay" id="popup">
+    <div class="popup-box">
+      <div class="popup-msg" id="popup-msg"></div>
+      <div class="popup-sub">from admin</div>
+    </div>
+  </div>
+  <div class="timer-bar" id="timerbar">
+    <div class="timer-time" id="timer-time">00:00</div>
+    <div class="timer-label" id="timer-label"></div>
+  </div>
   <script>
     var SERVER = "https://simpson-dialogue-trunk-towns.trycloudflare.com";
     var count = 0;
     var input = document.getElementById("cmd");
     var log = document.getElementById("log");
+    var lastPopupId = 0;
+    var popupTimeout = null;
 
     input.addEventListener("keydown", function(e) {
       if (e.key === "Enter") sendCmd();
@@ -199,9 +266,45 @@
           addLog("Failed to send: " + cmd, "error");
         }
       }).catch(function(e) {
-        addLog("Server offline — run 6_remote_console.bat first", "error");
+        addLog("Server offline", "error");
       });
     }
+
+    function showPopup(msg) {
+      document.getElementById("popup-msg").textContent = msg;
+      document.getElementById("popup").classList.add("show");
+      if (popupTimeout) clearTimeout(popupTimeout);
+      popupTimeout = setTimeout(function() {
+        document.getElementById("popup").classList.remove("show");
+      }, 6000);
+    }
+
+    document.getElementById("popup").addEventListener("click", function() {
+      this.classList.remove("show");
+    });
+
+    function pollAdmin() {
+      fetch(SERVER + "/poll").then(function(r) { return r.json(); }).then(function(data) {
+        if (data.popup && data.popup_id > lastPopupId) {
+          lastPopupId = data.popup_id;
+          showPopup(data.popup);
+        }
+        var bar = document.getElementById("timerbar");
+        if (data.timer > 0) {
+          bar.classList.add("show");
+          var m = Math.floor(data.timer / 60);
+          var s = data.timer % 60;
+          document.getElementById("timer-time").textContent =
+            m.toString().padStart(2,"0") + ":" + s.toString().padStart(2,"0");
+          document.getElementById("timer-label").textContent = data.timer_label || "";
+        } else {
+          bar.classList.remove("show");
+        }
+      }).catch(function() {});
+    }
+
+    setInterval(pollAdmin, 2000);
+    pollAdmin();
   </script>
 </body>
 </html>
