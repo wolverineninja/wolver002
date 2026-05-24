@@ -521,6 +521,8 @@
       }).catch(function() { addLog("Server offline", "error"); });
     }
 
+    function esc(s) { var d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+
     function renderViewerChat(list) {
       var el = document.getElementById("chat-box");
       el.innerHTML = "";
@@ -528,7 +530,7 @@
         var div = document.createElement("div");
         var isAdmin = m.name === "Admin";
         div.style.cssText = "padding:2px 0";
-        div.innerHTML = '<span style="color:#555;margin-right:6px">' + m.time + '</span><strong style="color:' + (isAdmin ? "#eab308" : "var(--accent)") + '">' + m.name + ':</strong> ' + m.message;
+        div.innerHTML = '<span style="color:#555;margin-right:6px">' + esc(m.time) + '</span><strong style="color:' + (isAdmin ? "#eab308" : "var(--accent)") + '">' + esc(m.name) + ':</strong> ' + esc(m.message);
         el.appendChild(div);
       });
       if (!list.length) el.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:8px">No messages yet</div>';
