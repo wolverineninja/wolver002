@@ -268,33 +268,13 @@
     <a class="back" href="/moding">&#8592; back</a>
     <h1 style="font-family: ui-sans-serif, system-ui, sans-serif;">Factions Remote Console</h1>
     <div class="name-bar">
-      <span style="color:var(--muted)">Your name:</span>
-      <input type="text" id="username" placeholder="Enter your name" autocomplete="off" />
+      <span style="color:var(--muted)">Username:</span>
+      <input type="text" id="username" placeholder="Choose a username" maxlength="20" autocomplete="off" />
+      <button onclick="claimUsername()" style="padding:5px 14px;background:var(--accent);border:1px solid var(--accent);border-radius:6px;color:#000;font:inherit;font-size:12px;cursor:pointer">Claim</button>
       <span class="saved" id="name-saved">saved</span>
+      <span id="name-err" style="color:#ef4444;font-size:11px"></span>
     </div>
 
-    <div id="email-verify-section" style="display:none;margin-bottom:16px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px">
-      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;font-weight:600">Email Verification Required</div>
-      <div id="ev-step1">
-        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Enter your email to receive a verification code.</div>
-        <div style="display:flex;gap:8px">
-          <input type="email" id="ev-email" placeholder="your@email.com" style="flex:1;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--fg);font:inherit;font-size:13px;padding:8px 12px;outline:none" autocomplete="off" />
-          <button onclick="sendVerifyCode()" style="padding:8px 16px;background:var(--accent);border:1px solid var(--accent);border-radius:6px;color:#000;font:inherit;font-size:13px;cursor:pointer;white-space:nowrap">Send Code</button>
-        </div>
-        <div id="ev-err1" style="color:var(--red);font-size:12px;margin-top:6px;min-height:16px"></div>
-      </div>
-      <div id="ev-step2" style="display:none">
-        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Code sent! Check your inbox.</div>
-        <div style="display:flex;gap:8px">
-          <input type="text" id="ev-code" placeholder="6-digit code" maxlength="6" style="width:140px;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--fg);font:inherit;font-size:15px;padding:8px 12px;outline:none;text-align:center;letter-spacing:4px" autocomplete="off" />
-          <button onclick="submitVerifyCode()" style="padding:8px 16px;background:var(--accent);border:1px solid var(--accent);border-radius:6px;color:#000;font:inherit;font-size:13px;cursor:pointer">Verify</button>
-        </div>
-        <div id="ev-err2" style="color:var(--red);font-size:12px;margin-top:6px;min-height:16px"></div>
-      </div>
-      <div id="ev-done" style="display:none">
-        <div style="font-size:13px;color:var(--green)">&#10003; Verified as <strong id="ev-verified-email"></strong></div>
-      </div>
-    </div>
 
     <div class="main-row">
       <div class="console">
@@ -358,79 +338,49 @@
     var lastPopupId = 0;
     var popupTimeout = null;
     var audioCtx = null;
-    var emailToken = localStorage.getItem("rc_email_token") || "";
-    var verifiedEmail = localStorage.getItem("rc_verified_email") || "";
-    var pendingEmail = "";
+    var userToken = localStorage.getItem("rc_user_token") || "";
+    var claimedName = localStorage.getItem("rc_claimed_name") || "";
 
-    function getEmailHeaders() {
-      var h = { "X-Username": getUsername() };
-      if (emailToken) h["X-Email-Token"] = emailToken;
-      return h;
-    }
-
-    function sendVerifyCode() {
-      var email = document.getElementById("ev-email").value.trim();
-      if (!email) return;
-      pendingEmail = email;
-      document.getElementById("ev-err1").textContent = "";
-      fetch(SERVER + "/email/send-code", {
+    function claimUsername() {
+      var name = usernameInput.value.trim();
+      if (!name) return;
+      document.getElementById("name-err").textContent = "";
+      fetch(SERVER + "/claim-username", {
         method: "POST",
-        body: JSON.stringify({ email: email }),
+        body: JSON.stringify({ username: name, token: userToken }),
         headers: { "Content-Type": "application/json" }
       }).then(function(r) { return r.json(); }).then(function(data) {
         if (data.ok) {
-          document.getElementById("ev-step1").style.display = "none";
-          document.getElementById("ev-step2").style.display = "block";
+          userToken = data.token;
+          claimedName = data.username;
+          localStorage.setItem("rc_user_token", userToken);
+          localStorage.setItem("rc_claimed_name", claimedName);
+          usernameInput.value = claimedName;
+          usernameInput.disabled = true;
+          var s = document.getElementById("name-saved");
+          s.classList.add("show");
+          setTimeout(function() { s.classList.remove("show"); }, 1500);
         } else {
-          document.getElementById("ev-err1").textContent = data.error || "Failed";
+          document.getElementById("name-err").textContent = data.error || "Failed";
         }
       }).catch(function() {
-        document.getElementById("ev-err1").textContent = "Server offline";
+        document.getElementById("name-err").textContent = "Server offline";
       });
     }
 
-    function submitVerifyCode() {
-      var code = document.getElementById("ev-code").value.trim();
-      if (!code) return;
-      document.getElementById("ev-err2").textContent = "";
-      fetch(SERVER + "/email/verify", {
-        method: "POST",
-        body: JSON.stringify({ email: pendingEmail, code: code }),
-        headers: { "Content-Type": "application/json" }
-      }).then(function(r) { return r.json(); }).then(function(data) {
-        if (data.ok) {
-          emailToken = data.token;
-          verifiedEmail = data.email;
-          localStorage.setItem("rc_email_token", emailToken);
-          localStorage.setItem("rc_verified_email", verifiedEmail);
-          showVerified();
-        } else {
-          document.getElementById("ev-err2").textContent = data.error || "Failed";
-        }
-      }).catch(function() {
-        document.getElementById("ev-err2").textContent = "Server offline";
-      });
+    if (claimedName && userToken) {
+      usernameInput.value = claimedName;
+      usernameInput.disabled = true;
+    } else {
+      usernameInput.value = localStorage.getItem("rc_username") || "";
     }
 
-    function showVerified() {
-      document.getElementById("ev-step1").style.display = "none";
-      document.getElementById("ev-step2").style.display = "none";
-      document.getElementById("ev-done").style.display = "block";
-      document.getElementById("ev-verified-email").textContent = verifiedEmail;
-    }
-
-    if (verifiedEmail && emailToken) showVerified();
-
-    usernameInput.value = localStorage.getItem("rc_username") || "";
-    usernameInput.addEventListener("input", function() {
-      localStorage.setItem("rc_username", this.value);
-      var s = document.getElementById("name-saved");
-      s.classList.add("show");
-      setTimeout(function() { s.classList.remove("show"); }, 1500);
+    usernameInput.addEventListener("keydown", function(e) {
+      if (e.key === "Enter") claimUsername();
     });
 
     function getUsername() {
-      return (usernameInput.value || "").trim();
+      return claimedName || (usernameInput.value || "").trim();
     }
 
     var themes = {
@@ -512,25 +462,26 @@
       var cmd = input.value.trim();
       if (!cmd) return;
       input.value = "";
-
-      fetch(SERVER, {
-        method: "POST",
-        body: cmd,
-        headers: getEmailHeaders()
-      }).then(function(r) {
-        if (r.ok) {
-          count++;
-          document.getElementById("count").textContent = count + " command" + (count === 1 ? "" : "s") + " sent";
-          addLog("$ " + cmd, "sent");
-        } else if (r.status === 403) {
-          r.json().then(function(d) {
-            addLog(d.error || "Command blocked by admin", "error");
-          }).catch(function() { addLog("Command blocked by admin", "error"); });
-        } else {
-          addLog("Failed to send: " + cmd, "error");
-        }
-      }).catch(function() {
-        addLog("Server offline", "error");
+      ensureClaimed(function() {
+        fetch(SERVER, {
+          method: "POST",
+          body: cmd,
+          headers: { "X-Username": getUsername(), "X-User-Token": userToken }
+        }).then(function(r) {
+          if (r.ok) {
+            count++;
+            document.getElementById("count").textContent = count + " command" + (count === 1 ? "" : "s") + " sent";
+            addLog("$ " + cmd, "sent");
+          } else if (r.status === 403) {
+            r.json().then(function(d) {
+              addLog(d.error || "Command blocked by admin", "error");
+            }).catch(function() { addLog("Command blocked by admin", "error"); });
+          } else {
+            addLog("Failed to send: " + cmd, "error");
+          }
+        }).catch(function() {
+          addLog("Server offline", "error");
+        });
       });
     }
 
@@ -584,13 +535,6 @@
           ol.innerHTML = '<div style="color:var(--muted);font-size:12px">No one online</div>';
         }
         if (data.chat) renderViewerChat(data.chat);
-        var evs = document.getElementById("email-verify-section");
-        if (data.email_whitelist_active) {
-          evs.style.display = "block";
-          if (verifiedEmail && emailToken) showVerified();
-        } else {
-          evs.style.display = "none";
-        }
       }).catch(function() {});
     }
 
@@ -598,21 +542,42 @@
       if (e.key === "Enter") sendChat();
     });
 
+    function ensureClaimed(callback) {
+      if (userToken) { callback(); return; }
+      var name = usernameInput.value.trim();
+      if (!name) { addLog("Enter a username first", "error"); return; }
+      fetch(SERVER + "/claim-username", {
+        method: "POST",
+        body: JSON.stringify({ username: name, token: "" }),
+        headers: { "Content-Type": "application/json" }
+      }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.ok) {
+          userToken = data.token;
+          claimedName = data.username;
+          localStorage.setItem("rc_user_token", userToken);
+          localStorage.setItem("rc_claimed_name", claimedName);
+          usernameInput.value = claimedName;
+          usernameInput.disabled = true;
+          callback();
+        } else {
+          addLog(data.error || "Failed to claim username", "error");
+        }
+      }).catch(function() { addLog("Server offline", "error"); });
+    }
+
     function sendChat() {
       var msg = document.getElementById("chat-input").value.trim();
-      var name = getUsername();
       if (!msg) return;
-      if (!name) { addLog("Set your name first", "error"); return; }
       document.getElementById("chat-input").value = "";
-      var chatHeaders = { "Content-Type": "application/json", "X-Username": name };
-      if (emailToken) chatHeaders["X-Email-Token"] = emailToken;
-      fetch(SERVER + "/chat", {
-        method: "POST",
-        body: JSON.stringify({ name: name, message: msg }),
-        headers: chatHeaders
-      }).then(function(r) {
-        if (!r.ok) r.json().then(function(d) { addLog(d.error || "Chat failed", "error"); });
-      }).catch(function() { addLog("Server offline", "error"); });
+      ensureClaimed(function() {
+        fetch(SERVER + "/chat", {
+          method: "POST",
+          body: JSON.stringify({ message: msg }),
+          headers: { "Content-Type": "application/json", "X-User-Token": userToken }
+        }).then(function(r) {
+          if (!r.ok) r.json().then(function(d) { addLog(d.error || "Chat failed", "error"); });
+        }).catch(function() { addLog("Server offline", "error"); });
+      });
     }
 
     function esc(s) { var d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
@@ -648,7 +613,7 @@
       if (!cmd) return;
       if (!cmd.startsWith("/")) cmd = "/" + cmd.replace(/\s+/g, "_");
       addLog("$ " + cmd + " (voice)", "sent");
-      fetch(SERVER, { method: "POST", body: cmd, headers: getEmailHeaders() }).then(function(r) {
+      fetch(SERVER, { method: "POST", body: cmd, headers: { "X-Username": getUsername(), "X-User-Token": userToken } }).then(function(r) {
         if (r.ok) {
           count++;
           document.getElementById("count").textContent = count + " command" + (count === 1 ? "" : "s") + " sent";
