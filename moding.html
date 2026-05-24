@@ -69,6 +69,16 @@
       letter-spacing: 0.04em;
       margin-left: 6px;
     }
+    .buttons {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .wink-msg {
+      margin-top: 16px;
+      font-size: 24px;
+      display: none;
+    }
     .video-wrap {
       margin-top: 24px;
       border: 1px solid var(--line);
@@ -90,9 +100,15 @@
     <h1>VR-Moding</h1>
     <p class="tagline">Past VR projects.</p>
 
-    <a class="archive-button" href="/factionsvr">
-      FactionsVR<span class="archive-label">(Archived)</span>
-    </a>
+    <div class="buttons">
+      <button class="archive-button" onclick="document.getElementById('wink').style.display='block'">
+        FactionsVR
+      </button>
+      <a class="archive-button" href="/factionsvr">
+        FactionsVR<span class="archive-label">(Archived)</span>
+      </a>
+    </div>
+    <p class="wink-msg" id="wink">😉</p>
   </main>
 </body>
 </html>
