@@ -240,40 +240,93 @@
       color: var(--muted);
       margin-top: 2px;
     }
-    .name-bar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 16px;
-      font-size: 13px;
-    }
-    .name-bar input {
+    .auth-btn {
+      position: fixed;
+      top: 16px;
+      right: 24px;
+      z-index: 150;
+      padding: 8px 18px;
       background: var(--card);
       border: 1px solid var(--line);
-      border-radius: 6px;
+      border-radius: 8px;
       color: var(--fg);
-      font: inherit;
+      font-family: inherit;
       font-size: 13px;
-      padding: 6px 12px;
-      outline: none;
-      width: 180px;
+      font-weight: 600;
+      cursor: pointer;
     }
-    .name-bar input:focus { border-color: #333; }
-    .name-bar .saved { color: var(--green); font-size: 11px; opacity: 0; transition: opacity 200ms; }
-    .name-bar .saved.show { opacity: 1; }
+    .auth-btn:hover { border-color: #333; }
+    .auth-btn .uname { color: var(--green); }
+    .auth-modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 160;
+      justify-content: center;
+      align-items: center;
+    }
+    .auth-modal.show { display: flex; }
+    .auth-box {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 32px 36px;
+      width: 320px;
+      text-align: center;
+    }
+    .auth-box h2 { font-size: 18px; margin-bottom: 18px; font-weight: 600; font-family: ui-sans-serif, system-ui, sans-serif; }
+    .auth-box input {
+      width: 100%;
+      margin-bottom: 10px;
+      text-align: center;
+      font-size: 14px;
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--fg);
+      padding: 10px;
+      font-family: inherit;
+      outline: none;
+    }
+    .auth-box input:focus { border-color: #333; }
+    .auth-btns { display: flex; gap: 8px; margin-top: 14px; }
+    .auth-btns button {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .auth-btns .btn-su { background: #222; color: var(--fg); }
+    .auth-btns .btn-su:hover { background: #2a2a2a; }
+    .auth-btns .btn-li { background: var(--green); color: #000; }
+    .auth-btns .btn-li:hover { opacity: 0.85; }
+    .auth-err { color: var(--red); font-size: 12px; margin-top: 10px; min-height: 16px; }
   </style>
 </head>
 <body>
   <main>
+    <button class="auth-btn" id="auth-btn" onclick="openAuth()">Log In</button>
+
+    <div class="auth-modal" id="auth-modal">
+      <div class="auth-box">
+        <h2>Log In</h2>
+        <input type="text" id="auth-user" placeholder="Username" autocomplete="off" />
+        <input type="password" id="auth-pass" placeholder="Password" autocomplete="off" />
+        <div class="auth-btns">
+          <button class="btn-su" onclick="doSignup()">Sign Up</button>
+          <button class="btn-li" onclick="doLogin()">Log In</button>
+        </div>
+        <div class="auth-err" id="auth-err"></div>
+      </div>
+    </div>
+
     <a class="back" href="/moding">&#8592; back</a>
     <h1 style="font-family: ui-sans-serif, system-ui, sans-serif;">Factions Remote Console</h1>
-    <div class="name-bar">
-      <span style="color:var(--muted)">Username:</span>
-      <input type="text" id="username" placeholder="Choose a username" maxlength="20" autocomplete="off" />
-      <button onclick="claimUsername()" style="padding:5px 14px;background:var(--accent);border:1px solid var(--accent);border-radius:6px;color:#000;font:inherit;font-size:12px;cursor:pointer">Claim</button>
-      <span class="saved" id="name-saved">saved</span>
-      <span id="name-err" style="color:#ef4444;font-size:11px"></span>
-    </div>
 
 
     <div class="main-row">
@@ -334,54 +387,96 @@
     var count = 0;
     var input = document.getElementById("cmd");
     var log = document.getElementById("log");
-    var usernameInput = document.getElementById("username");
     var lastPopupId = 0;
     var popupTimeout = null;
     var audioCtx = null;
     var userToken = localStorage.getItem("rc_user_token") || "";
-    var claimedName = localStorage.getItem("rc_claimed_name") || "";
-
-    function claimUsername() {
-      var name = usernameInput.value.trim();
-      if (!name) return;
-      document.getElementById("name-err").textContent = "";
-      fetch(SERVER + "/claim-username", {
-        method: "POST",
-        body: JSON.stringify({ username: name, token: userToken }),
-        headers: { "Content-Type": "application/json" }
-      }).then(function(r) { return r.json(); }).then(function(data) {
-        if (data.ok) {
-          userToken = data.token;
-          claimedName = data.username;
-          localStorage.setItem("rc_user_token", userToken);
-          localStorage.setItem("rc_claimed_name", claimedName);
-          usernameInput.value = claimedName;
-          usernameInput.disabled = true;
-          var s = document.getElementById("name-saved");
-          s.classList.add("show");
-          setTimeout(function() { s.classList.remove("show"); }, 1500);
-        } else {
-          document.getElementById("name-err").textContent = data.error || "Failed";
-        }
-      }).catch(function() {
-        document.getElementById("name-err").textContent = "Server offline";
-      });
-    }
-
-    if (claimedName && userToken) {
-      usernameInput.value = claimedName;
-      usernameInput.disabled = true;
-    } else {
-      usernameInput.value = localStorage.getItem("rc_username") || "";
-    }
-
-    usernameInput.addEventListener("keydown", function(e) {
-      if (e.key === "Enter") claimUsername();
-    });
+    var userName = localStorage.getItem("rc_user_name") || "";
 
     function getUsername() {
-      return claimedName || (usernameInput.value || "").trim();
+      return userName || "";
     }
+
+    function updateAuthBtn() {
+      var btn = document.getElementById("auth-btn");
+      if (userToken && userName) {
+        btn.innerHTML = '<span class="uname">' + userName + '</span> &#8226; Log Out';
+        btn.onclick = doLogout;
+      } else {
+        btn.innerHTML = 'Log In';
+        btn.onclick = openAuth;
+      }
+    }
+
+    function openAuth() {
+      document.getElementById("auth-err").textContent = "";
+      document.getElementById("auth-user").value = "";
+      document.getElementById("auth-pass").value = "";
+      document.getElementById("auth-modal").classList.add("show");
+      setTimeout(function() { document.getElementById("auth-user").focus(); }, 100);
+    }
+
+    function closeAuth() {
+      document.getElementById("auth-modal").classList.remove("show");
+    }
+
+    function doLogin() {
+      var u = document.getElementById("auth-user").value.trim();
+      var p = document.getElementById("auth-pass").value;
+      if (!u || !p) { document.getElementById("auth-err").textContent = "Fill in both fields"; return; }
+      fetch(SERVER + "/account/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: u, password: p })
+      }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.error) { document.getElementById("auth-err").textContent = d.error; return; }
+        userToken = d.token;
+        userName = d.username;
+        localStorage.setItem("rc_user_token", userToken);
+        localStorage.setItem("rc_user_name", userName);
+        closeAuth();
+        updateAuthBtn();
+        addLog("Logged in as " + userName, "sent");
+      }).catch(function() { document.getElementById("auth-err").textContent = "Server offline"; });
+    }
+
+    function doSignup() {
+      var u = document.getElementById("auth-user").value.trim();
+      var p = document.getElementById("auth-pass").value;
+      if (!u || !p) { document.getElementById("auth-err").textContent = "Fill in both fields"; return; }
+      fetch(SERVER + "/account/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: u, password: p })
+      }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.error) { document.getElementById("auth-err").textContent = d.error; return; }
+        userToken = d.token;
+        userName = d.username;
+        localStorage.setItem("rc_user_token", userToken);
+        localStorage.setItem("rc_user_name", userName);
+        closeAuth();
+        updateAuthBtn();
+        addLog("Account created: " + userName, "sent");
+      }).catch(function() { document.getElementById("auth-err").textContent = "Server offline"; });
+    }
+
+    function doLogout() {
+      userToken = "";
+      userName = "";
+      localStorage.removeItem("rc_user_token");
+      localStorage.removeItem("rc_user_name");
+      updateAuthBtn();
+      addLog("Logged out", "");
+    }
+
+    document.getElementById("auth-modal").addEventListener("click", function(e) {
+      if (e.target === this) closeAuth();
+    });
+    document.getElementById("auth-pass").addEventListener("keydown", function(e) {
+      if (e.key === "Enter") doLogin();
+    });
+
+    updateAuthBtn();
 
     var themes = {
       default: { bg: "#0b0b0c", fg: "#e8e8ea", muted: "#8a8a92", line: "#1f1f23", card: "#111114", accent: "#22c55e" },
@@ -543,26 +638,8 @@
     });
 
     function ensureClaimed(callback) {
-      if (userToken) { callback(); return; }
-      var name = usernameInput.value.trim();
-      if (!name) { addLog("Enter a username first", "error"); return; }
-      fetch(SERVER + "/claim-username", {
-        method: "POST",
-        body: JSON.stringify({ username: name, token: "" }),
-        headers: { "Content-Type": "application/json" }
-      }).then(function(r) { return r.json(); }).then(function(data) {
-        if (data.ok) {
-          userToken = data.token;
-          claimedName = data.username;
-          localStorage.setItem("rc_user_token", userToken);
-          localStorage.setItem("rc_claimed_name", claimedName);
-          usernameInput.value = claimedName;
-          usernameInput.disabled = true;
-          callback();
-        } else {
-          addLog(data.error || "Failed to claim username", "error");
-        }
-      }).catch(function() { addLog("Server offline", "error"); });
+      if (userToken && userName) { callback(); return; }
+      addLog("Log in first (button top-right)", "error");
     }
 
     function sendChat() {
