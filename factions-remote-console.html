@@ -325,6 +325,19 @@
       </div>
     </div>
 
+    <div class="auth-modal" id="link-modal">
+      <div class="auth-box">
+        <h2>Link Game Name</h2>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:14px">Enter your in-game username so commands show as you, not the admin.</p>
+        <input type="text" id="link-name" placeholder="In-game name" autocomplete="off" />
+        <div class="auth-btns">
+          <button class="btn-su" onclick="closeLinkModal()">Skip</button>
+          <button class="btn-li" onclick="doLink()">Link</button>
+        </div>
+        <div class="auth-err" id="link-err"></div>
+      </div>
+    </div>
+
     <a class="back" href="/moding">&#8592; back</a>
     <h1 style="font-family: ui-sans-serif, system-ui, sans-serif;">Factions Remote Console</h1>
 
@@ -392,6 +405,7 @@
     var audioCtx = null;
     var userToken = localStorage.getItem("rc_user_token") || "";
     var userName = localStorage.getItem("rc_user_name") || "";
+    var gameName = localStorage.getItem("rc_game_name") || "";
 
     function getUsername() {
       return userName || "";
@@ -400,13 +414,52 @@
     function updateAuthBtn() {
       var btn = document.getElementById("auth-btn");
       if (userToken && userName) {
-        btn.innerHTML = '<span class="uname">' + userName + '</span> &#8226; Log Out';
+        if (gameName) {
+          btn.innerHTML = '<span class="uname">' + userName + '</span> <span style="color:var(--muted)">(' + gameName + ')</span> &#8226; Log Out';
+        } else {
+          btn.innerHTML = '<span class="uname">' + userName + '</span> &#8226; <span style="color:var(--accent);cursor:pointer" onclick="event.stopPropagation();openLinkModal()">Link</span> &#8226; Log Out';
+        }
         btn.onclick = doLogout;
       } else {
         btn.innerHTML = 'Log In';
         btn.onclick = openAuth;
       }
     }
+
+    function openLinkModal() {
+      document.getElementById("link-err").textContent = "";
+      document.getElementById("link-name").value = "";
+      document.getElementById("link-modal").classList.add("show");
+      setTimeout(function() { document.getElementById("link-name").focus(); }, 100);
+    }
+
+    function closeLinkModal() {
+      document.getElementById("link-modal").classList.remove("show");
+    }
+
+    function doLink() {
+      var name = document.getElementById("link-name").value.trim();
+      if (!name) { document.getElementById("link-err").textContent = "Enter your in-game name"; return; }
+      fetch(SERVER + "/account/link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-User-Token": userToken },
+        body: JSON.stringify({ game_name: name })
+      }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.error) { document.getElementById("link-err").textContent = d.error; return; }
+        gameName = d.game_name;
+        localStorage.setItem("rc_game_name", gameName);
+        closeLinkModal();
+        updateAuthBtn();
+        addLog("Linked game name: " + gameName, "sent");
+      }).catch(function() { document.getElementById("link-err").textContent = "Server offline"; });
+    }
+
+    document.getElementById("link-modal").addEventListener("click", function(e) {
+      if (e.target === this) closeLinkModal();
+    });
+    document.getElementById("link-name").addEventListener("keydown", function(e) {
+      if (e.key === "Enter") doLink();
+    });
 
     function openAuth() {
       document.getElementById("auth-err").textContent = "";
@@ -437,6 +490,7 @@
         closeAuth();
         updateAuthBtn();
         addLog("Logged in as " + userName, "sent");
+        if (!gameName) openLinkModal();
       }).catch(function() { document.getElementById("auth-err").textContent = "Server offline"; });
     }
 
@@ -457,14 +511,17 @@
         closeAuth();
         updateAuthBtn();
         addLog("Account created: " + userName, "sent");
+        openLinkModal();
       }).catch(function() { document.getElementById("auth-err").textContent = "Server offline"; });
     }
 
     function doLogout() {
       userToken = "";
       userName = "";
+      gameName = "";
       localStorage.removeItem("rc_user_token");
       localStorage.removeItem("rc_user_name");
+      localStorage.removeItem("rc_game_name");
       updateAuthBtn();
       addLog("Logged out", "");
     }
