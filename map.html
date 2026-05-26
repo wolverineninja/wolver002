@@ -808,9 +808,8 @@
     var livePlayerMarkers = {};
 
     function makeSkinIcon(skinId, name) {
-      var faceUrl = skinId
-        ? "https://crafatar.com/avatars/" + skinId + "?size=32&overlay"
-        : "https://crafatar.com/avatars/8667ba71-b85a-4004-af54-457a9734eed7?size=32&overlay";
+      var uuid = skinId || "8667ba71-b85a-4004-af54-457a9734eed7";
+      var faceUrl = "https://api.wolver002.com/skin/" + uuid;
       return L.divIcon({
         className: "",
         html: '<div style="text-align:center;white-space:nowrap">' +
