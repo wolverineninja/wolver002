@@ -759,36 +759,88 @@
 
     renderWaypoints();
 
-    var SERVER = "https://admin.wolver002.com";
+    var PLAYERS_API = "https://factionsvr.com/api/map/players";
     var trackingTargets = {};
     var trackTrails = {};
     var trackMarkers = {};
     var pendingTrackPlayer = null;
+    var livePlayerMarkers = {};
+
+    function makeSkinIcon(skinId, name) {
+      var faceUrl = "https://visage.surgeplay.com/face/32/" + skinId;
+      return L.divIcon({
+        className: "",
+        html: '<div style="text-align:center;white-space:nowrap">' +
+              '<img src="' + faceUrl + '" width="24" height="24" style="display:block;margin:0 auto;border:2px solid #fff;border-radius:3px;image-rendering:pixelated"/>' +
+              '<span style="font-size:10px;background:rgba(0,0,0,0.7);color:#fff;padding:1px 4px;border-radius:3px;margin-top:2px;display:inline-block">' + name + '</span>' +
+              '</div>',
+        iconSize: [60, 44],
+        iconAnchor: [30, 12],
+        popupAnchor: [0, -12]
+      });
+    }
 
     function fetchOnlinePlayers() {
-      fetch(SERVER + "/poll", { headers: { "X-Username": "" } })
+      fetch(PLAYERS_API)
         .then(function(r) {
           if (!r.ok) throw new Error(r.status);
           return r.json();
         })
         .then(function(d) {
           var list = document.getElementById("track-player-list");
-          var online = d.online || [];
-          if (!online.length) {
+          var players = (d.players || []);
+          if (!players.length) {
             list.innerHTML = '<div style="font-size:11px;color:#555;padding:4px 0">No players online</div>';
+            Object.keys(livePlayerMarkers).forEach(function(n) { map.removeLayer(livePlayerMarkers[n]); });
+            livePlayerMarkers = {};
             return;
           }
+
+          // Update left panel
           list.innerHTML = "";
-          online.forEach(function(name) {
+          var seen = {};
+          players.forEach(function(p) {
+            var name = p.Username;
+            var pos = p.Pose && p.Pose.Head && p.Pose.Head.Position;
+            var gx = pos ? Math.round(pos[0]) : "?";
+            var gz = pos ? Math.round(pos[2]) : "?";
+            seen[name] = true;
+
             var item = document.createElement("div");
             item.className = "track-player-item";
-            var isTracked = !!trackingTargets[name];
-            item.innerHTML = '<div class="dot-on"></div><span>' + name + '</span>' +
-              (isTracked ? ' <span style="font-size:9px;color:var(--muted)">(tracking)</span>' : '');
-            if (!isTracked) {
-              item.onclick = function() { openTrackForm(name); };
+            item.style.flexDirection = "column";
+            item.style.alignItems = "flex-start";
+            item.style.paddingBottom = "6px";
+            item.innerHTML =
+              '<div style="display:flex;align-items:center;gap:6px">' +
+                '<div class="dot-on"></div>' +
+                '<span style="font-weight:600">' + name + '</span>' +
+              '</div>' +
+              '<div style="font-size:10px;color:var(--muted);padding-left:12px">X: ' + gx + '  Z: ' + gz + ' &nbsp;·&nbsp; ' + (p.PlayTime || "") + '</div>';
+            if (pos) {
+              item.style.cursor = "pointer";
+              item.onclick = (function(x, z) {
+                return function() { map.setView(gameToLatLng(x, z), Math.max(map.getZoom(), -2)); };
+              })(Math.round(pos[0]), Math.round(pos[2]));
             }
             list.appendChild(item);
+
+            // Place/update marker on map
+            if (pos) {
+              var ll = gameToLatLng(Math.round(pos[0]), Math.round(pos[2]));
+              if (livePlayerMarkers[name]) {
+                livePlayerMarkers[name].setLatLng(ll);
+              } else {
+                livePlayerMarkers[name] = L.marker(ll, { icon: makeSkinIcon(p.SkinId, name), zIndexOffset: 500 })
+                  .addTo(map)
+                  .bindPopup('<b>' + name + '</b><br>X: ' + Math.round(pos[0]) + '  Z: ' + Math.round(pos[2]) + '<br>Ping: ' + Math.round(p.ping || 0) + 'ms');
+              }
+            }
+          });
+
+          // Remove markers for players who logged off
+          Object.keys(livePlayerMarkers).forEach(function(n) {
+            if (!seen[n]) { map.removeLayer(livePlayerMarkers[n]); delete livePlayerMarkers[n]; }
           });
         })
         .catch(function() {
@@ -834,11 +886,14 @@
     }
 
     function pollPlayerPos(name) {
-      fetch(SERVER + "/player-pos/" + encodeURIComponent(name))
+      fetch(PLAYERS_API)
         .then(function(r) { return r.json(); })
         .then(function(d) {
-          if (!d || d.error) return;
-          var point = { x: d.x, z: d.z, t: d.t || Date.now() / 1000 };
+          var players = d.players || [];
+          var p = players.find(function(pl) { return pl.Username === name; });
+          if (!p || !p.Pose || !p.Pose.Head) return;
+          var pos = p.Pose.Head.Position;
+          var point = { x: Math.round(pos[0]), z: Math.round(pos[2]), t: Date.now() / 1000 };
           var trail = trackTrails[name];
           if (trail.length > 0) {
             var last = trail[trail.length - 1];
