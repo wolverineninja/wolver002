@@ -326,8 +326,8 @@
       margin-bottom: 6px;
     }
     .track-player-list {
-      max-height: 120px;
       overflow-y: auto;
+      flex: 1;
     }
     .track-player-item {
       display: flex;
@@ -478,7 +478,9 @@
     .left-panel-toggle .arrow { color: var(--muted); font-size: 14px; }
     .left-panel-content {
       flex: 1;
-      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
       padding: 6px 0;
     }
     .crosshair-cursor .leaflet-container { cursor: crosshair !important; }
