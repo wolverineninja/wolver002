@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Skin Search · wolver002</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='14' font-size='14'%3E%E2%97%8F%3C/text%3E%3C/svg%3E" />
+  <style>
+    :root {
+      --bg: #0b0b0c;
+      --fg: #e8e8ea;
+      --muted: #8a8a92;
+      --line: #1f1f23;
+      --card: #111114;
+      --accent: #22c55e;
+      --red: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+    main {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 64px 24px 96px;
+    }
+    .back {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 14px;
+      display: inline-block;
+      margin-bottom: 32px;
+    }
+    .back:hover { color: var(--fg); }
+    h1 {
+      font-size: clamp(28px, 4vw, 38px);
+      letter-spacing: -0.02em;
+      margin: 0 0 8px;
+      font-weight: 600;
+    }
+    .tagline {
+      color: var(--muted);
+      margin: 0 0 36px;
+    }
+    .search-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 36px;
+    }
+    .search-row input {
+      flex: 1;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--fg);
+      font: inherit;
+      font-size: 15px;
+      padding: 10px 14px;
+      outline: none;
+      transition: border-color 160ms;
+    }
+    .search-row input:focus { border-color: #333; }
+    .search-row button {
+      padding: 10px 20px;
+      background: var(--accent);
+      border: none;
+      border-radius: 8px;
+      color: #000;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 160ms;
+    }
+    .search-row button:hover { opacity: 0.85; }
+    .result { display: none; }
+    .result.show { display: block; }
+    .skin-card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 28px;
+      display: flex;
+      gap: 28px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+    .skin-avatar {
+      image-rendering: pixelated;
+      border-radius: 6px;
+      width: 100px;
+      height: 100px;
+    }
+    .skin-texture {
+      image-rendering: pixelated;
+      border-radius: 6px;
+      width: 128px;
+      height: 128px;
+      background: repeating-conic-gradient(#1a1a1e 0% 25%, #111114 0% 50%) 0 0 / 16px 16px;
+    }
+    .skin-info { flex: 1; min-width: 160px; }
+    .skin-name {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 6px;
+    }
+    .skin-uuid {
+      font-size: 11px;
+      color: var(--muted);
+      font-family: ui-monospace, monospace;
+      margin-bottom: 20px;
+      word-break: break-all;
+    }
+    .dl-btn {
+      display: inline-block;
+      padding: 9px 18px;
+      background: var(--accent);
+      border-radius: 7px;
+      color: #000;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: opacity 160ms;
+    }
+    .dl-btn:hover { opacity: 0.85; }
+    .labels {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 10px;
+    }
+    .label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+    .error-msg {
+      display: none;
+      color: var(--red);
+      font-size: 14px;
+      margin-top: 12px;
+    }
+    .error-msg.show { display: block; }
+  </style>
+</head>
+<body>
+  <main>
+    <a class="back" href="/coolprojects">← back</a>
+    <h1>Skin Search</h1>
+    <p class="tagline">Look up any Minecraft player's skin.</p>
+
+    <div class="search-row">
+      <input type="text" id="username" placeholder="Enter username..." maxlength="16" autocomplete="off" />
+      <button onclick="lookupSkin()">Search</button>
+    </div>
+
+    <p class="error-msg" id="error">Player not found.</p>
+
+    <div class="result" id="result">
+      <div class="labels">
+        <span class="label" style="width:100px">Avatar</span>
+        <span class="label" style="width:128px">Full Skin</span>
+      </div>
+      <div class="skin-card">
+        <img class="skin-avatar" id="avatar" src="" alt="avatar" />
+        <img class="skin-texture" id="texture" src="" alt="skin" />
+        <div class="skin-info">
+          <div class="skin-name" id="skin-name"></div>
+          <div class="skin-uuid" id="skin-uuid"></div>
+          <a class="dl-btn" id="dl-btn" href="#" download>Download Skin</a>
+        </div>
+      </div>
+    </div>
+  </main>
+  <script>
+    document.getElementById("username").addEventListener("keydown", function(e) {
+      if (e.key === "Enter") lookupSkin();
+    });
+
+    async function lookupSkin() {
+      var username = document.getElementById("username").value.trim();
+      if (!username) return;
+
+      document.getElementById("result").classList.remove("show");
+      document.getElementById("error").classList.remove("show");
+
+      try {
+        var res = await fetch("https://api.ashcon.app/mojang/v2/user/" + encodeURIComponent(username));
+        if (!res.ok) throw new Error("not found");
+        var data = await res.json();
+
+        var skinUrl = data.textures && data.textures.skin && data.textures.skin.url;
+        if (!skinUrl) throw new Error("no skin");
+
+        var avatarUrl = "https://mc-heads.net/avatar/" + data.uuid + "/100";
+        var proxyUrl  = "https://api.wolver002.com/skin/" + data.uuid;
+
+        document.getElementById("skin-name").textContent = data.username;
+        document.getElementById("skin-uuid").textContent = data.uuid;
+        document.getElementById("avatar").src = avatarUrl;
+        document.getElementById("texture").src = proxyUrl;
+        document.getElementById("dl-btn").href = proxyUrl;
+        document.getElementById("dl-btn").setAttribute("download", data.username + "_skin.png");
+        document.getElementById("result").classList.add("show");
+      } catch(e) {
+        document.getElementById("error").classList.add("show");
+      }
+    }
+  </script>
+</body>
+</html>
