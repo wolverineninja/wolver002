@@ -487,6 +487,39 @@
       align-items: center;
       justify-content: center;
     }
+    .zoom-slider-wrap {
+      position: absolute;
+      left: 12px;
+      bottom: 48px;
+      z-index: 1000;
+      background: rgba(17,17,20,0.95);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      backdrop-filter: blur(8px);
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .zoom-slider-wrap label {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+    .zoom-slider-wrap input[type=range] {
+      width: 120px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    .zoom-slider-val {
+      font-size: 11px;
+      color: var(--fg);
+      font-family: ui-monospace, monospace;
+      min-width: 22px;
+      text-align: right;
+    }
   </style>
 </head>
 <body>
@@ -498,6 +531,12 @@
   </div>
 
   <div class="coord-bar" id="coord-bar">X: 0, Z: 0 | Chunk: 0, 0</div>
+
+  <div class="zoom-slider-wrap">
+    <label>Zoom</label>
+    <input type="range" id="zoom-slider" min="-10" max="2" step="1" value="-4" />
+    <span class="zoom-slider-val" id="zoom-val">-4</span>
+  </div>
 
   <div class="panel" id="panel">
     <div class="panel-toggle" onclick="togglePanel()">
@@ -977,6 +1016,19 @@
     fetchOnlinePlayers();
     setInterval(fetchOnlinePlayers, 10000);
     renderActiveTracking();
+
+    // Zoom slider
+    var zoomSlider = document.getElementById("zoom-slider");
+    var zoomVal = document.getElementById("zoom-val");
+    zoomSlider.addEventListener("input", function() {
+      map.setZoom(parseInt(this.value));
+      zoomVal.textContent = this.value;
+    });
+    map.on("zoomend", function() {
+      var z = map.getZoom();
+      zoomSlider.value = z;
+      zoomVal.textContent = z;
+    });
   </script>
 </body>
 </html>
