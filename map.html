@@ -813,11 +813,18 @@
 
     function makeSkinIcon(skinId, name) {
       var uuid = skinId || "8667ba71-b85a-4004-af54-457a9734eed7";
-      var faceUrl = "https://factionsvr.com/api/game/skin/image/" + uuid;
+      var skinUrl = "https://factionsvr.com/api/game/skin/image/" + uuid;
+      // Minecraft skins are 64x64; the face is the 8x8 region at (8,8) and the
+      // hat overlay is the 8x8 region at (40,8). We scale 3x to fill a 24x24 box.
+      var faceBg = 'background:url("' + skinUrl + '") -24px -24px / 192px 192px;image-rendering:pixelated;';
+      var hatBg  = 'background:url("' + skinUrl + '") -120px -24px / 192px 192px;image-rendering:pixelated;';
       return L.divIcon({
         className: "",
         html: '<div style="text-align:center;white-space:nowrap">' +
-              '<img src="' + faceUrl + '" width="24" height="24" style="display:block;margin:0 auto;border:2px solid #fff;border-radius:3px;image-rendering:pixelated"/>' +
+              '<div style="position:relative;width:24px;height:24px;margin:0 auto;border:2px solid #fff;border-radius:3px;overflow:hidden">' +
+                '<div style="position:absolute;inset:0;' + faceBg + '"></div>' +
+                '<div style="position:absolute;inset:0;' + hatBg  + '"></div>' +
+              '</div>' +
               '<span style="font-size:10px;background:rgba(0,0,0,0.7);color:#fff;padding:1px 4px;border-radius:3px;margin-top:2px;display:inline-block">' + name + '</span>' +
               '</div>',
         iconSize: [60, 44],
