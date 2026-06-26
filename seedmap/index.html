@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang=en>
+<head>
+<meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Wolver SeedMap</title>
+<style>
+:root{
+  --bg:#0c0d11; --panel:#15171d; --panel2:#1b1e25; --line:#2a2e37; --line2:#363b46;
+  --txt:#e9eaee; --dim:#878d9b; --dim2:#5f6573; --accent:#c79a55; --accent-d:#8c6a35;
+  --good:#79c8a0;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
+  font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,"SF Mono","Cascadia Mono","JetBrains Mono",Menlo,Consolas,monospace}
+#map{position:fixed;inset:0;display:block;cursor:grab;touch-action:none;background:#0c0d11}
+#map.drag{cursor:grabbing}
+.panel{position:fixed;background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  box-shadow:0 12px 40px -12px rgba(0,0,0,.7),0 0 0 1px rgba(0,0,0,.2)}
+
+/* top bar */
+#bar{top:16px;left:16px;right:16px;display:flex;gap:8px;align-items:center;padding:8px;z-index:20;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:9px;padding:0 12px 0 6px;font-weight:600;font-size:14.5px;letter-spacing:-.2px}
+.brand svg{width:24px;height:24px;color:var(--accent)}
+.brand .lo{color:var(--dim)}
+.divv{width:1px;height:26px;background:var(--line);margin:0 2px}
+.field{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--line);border-radius:9px;height:38px;padding:0 11px}
+.field:focus-within{border-color:var(--line2)}
+.field.seed{flex:1;min-width:170px}
+.field .lab{color:var(--dim2);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600}
+.field input{flex:1;background:none;border:0;outline:0;color:var(--txt);font-size:13.5px;font-family:inherit;min-width:60px}
+.field input::placeholder{color:var(--dim2)}
+select{height:38px;background:var(--bg);border:1px solid var(--line);color:var(--txt);border-radius:9px;
+  padding:0 30px 0 11px;font-size:13px;font-family:inherit;outline:0;cursor:pointer;
+  appearance:none;-webkit-appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23878d9b' stroke-width='1.4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 11px center}
+select:hover{border-color:var(--line2)}
+.btn{height:38px;padding:0 18px;border:1px solid transparent;border-radius:9px;font-size:13.5px;font-weight:600;
+  cursor:pointer;font-family:inherit;letter-spacing:.1px;display:inline-flex;align-items:center;gap:7px;
+  background:var(--accent);color:#1a140a;transition:filter .12s}
+.btn:hover{filter:brightness(1.07)}.btn:active{filter:brightness(.95)}
+.btn.ic{background:var(--bg);border-color:var(--line);color:var(--dim);padding:0 11px}
+.btn.ic:hover{color:var(--txt);border-color:var(--line2)}
+.btn.ic svg{width:17px;height:17px}
+
+/* left panel */
+#side{top:78px;left:16px;width:226px;max-height:calc(100vh - 104px);overflow-y:auto;z-index:15;padding:4px}
+#side::-webkit-scrollbar{width:7px}#side::-webkit-scrollbar-track{background:transparent}
+#side::-webkit-scrollbar-thumb{background:var(--line2);border-radius:7px}
+.grp{padding:9px 8px 4px}
+.grp h4{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--dim2);font-weight:700;
+  margin:0 4px 7px;display:flex;align-items:center;gap:7px}
+.grp h4::after{content:"";flex:1;height:1px;background:var(--line)}
+.it{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:8px;cursor:pointer;user-select:none;
+  font-size:13px;color:var(--dim);transition:background .1s,color .1s}
+.it:hover{background:var(--panel2);color:var(--txt)}
+.it.on{color:var(--txt)}
+.it .gi{width:22px;height:22px;flex:0 0 22px;display:grid;place-items:center;border-radius:6px;background:var(--panel2)}
+.it .gi svg{width:15px;height:15px;display:block}
+.it.on .gi{background:rgba(199,154,85,.14)}
+.it .nm{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.it .ck{width:15px;height:15px;flex:0 0 15px;border:1.5px solid var(--line2);border-radius:5px;position:relative;transition:.12s}
+.it.on .ck{background:var(--accent);border-color:var(--accent)}
+.it.on .ck::after{content:"";position:absolute;left:4.5px;top:1.5px;width:4px;height:8px;border:solid #1a140a;
+  border-width:0 2px 2px 0;transform:rotate(45deg)}
+
+/* bottom status */
+#stat{bottom:16px;left:16px;display:flex;align-items:stretch;height:40px;z-index:15;overflow:hidden}
+#stat .cell{display:flex;align-items:center;gap:7px;padding:0 14px;border-right:1px solid var(--line)}
+#stat .cell:last-child{border-right:0}
+#stat .k{color:var(--dim2);font-size:10px;text-transform:uppercase;letter-spacing:.8px;font-weight:600}
+#stat .v{font-size:13px;font-weight:500}
+#stat .sw{width:12px;height:12px;border-radius:3px;border:1px solid rgba(255,255,255,.18);flex:0 0 12px}
+
+/* zoom */
+#zoom{bottom:16px;right:16px;display:flex;flex-direction:column;z-index:15;overflow:hidden;padding:0}
+#zoom button{width:40px;height:40px;background:none;border:0;color:var(--dim);cursor:pointer;display:grid;place-items:center}
+#zoom button:hover{background:var(--panel2);color:var(--txt)}
+#zoom button:first-child{border-bottom:1px solid var(--line)}
+#zoom svg{width:16px;height:16px}
+
+/* tooltip */
+#tip{position:fixed;z-index:30;background:var(--panel2);border:1px solid var(--line2);border-radius:10px;
+  padding:10px 12px;font-size:13px;box-shadow:0 12px 40px -8px rgba(0,0,0,.8);pointer-events:none;display:none;min-width:150px}
+#tip .t{font-weight:600;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+#tip .t .gi{width:20px;height:20px;border-radius:5px;display:grid;place-items:center}
+#tip .t .gi svg{width:13px;height:13px}
+#tip .c{color:var(--dim);font-size:12px}
+#tip .tp{margin-top:8px;font-size:11.5px;color:var(--accent);pointer-events:auto;cursor:pointer;
+  display:inline-flex;align-items:center;gap:5px;border-top:1px solid var(--line);padding-top:7px}
+#tip .tp svg{width:12px;height:12px}
+
+/* loading */
+#load{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:var(--bg)}
+#load .ring{width:38px;height:38px;border:2.5px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#load .msg{color:var(--dim);font-size:13px;letter-spacing:.2px}
+.hint{position:fixed;bottom:68px;left:50%;transform:translateX(-50%);z-index:14;color:var(--dim2);font-size:11.5px;
+  letter-spacing:.2px;transition:opacity .4s;pointer-events:none}
+@media(max-width:720px){#side{display:none}.hint{display:none}.brand .lo{display:none}}
+</style>
+</head>
+<body>
+<canvas id=map></canvas>
+<div id=load><div class=ring></div><div class=msg>loading world engine</div></div>
+
+<div class="panel" id=bar>
+  <div class=brand>
+    <svg viewBox="0 0 24 24" fill=none stroke=currentColor stroke-width=1.6 stroke-linejoin=round><path d="M12 2l3.2 6.4L22 9.6l-5 4.9 1.2 6.9L12 18.1 5.8 21.4 7 14.5 2 9.6l6.8-1.2z"/><circle cx=12 cy=12 r=2.4/></svg>
+    <span>Wolver<span class=lo>SeedMap</span></span>
+  </div>
+  <div class=divv></div>
+  <div class="field seed"><span class=lab>Seed</span><input id=seed placeholder="random / number / text" autocomplete=off spellcheck=false></div>
+  <select id=ver title="Minecraft version"></select>
+  <select id=dim title=Dimension><option value=0>Overworld</option><option value=-1>Nether</option><option value=1>The End</option></select>
+  <button class=btn id=go>Generate</button>
+  <button class="btn ic" id=rand title="Random seed"><svg viewBox="0 0 24 24" fill=none stroke=currentColor stroke-width=1.7 stroke-linecap=round stroke-linejoin=round><rect x=3 y=3 width=18 height=18 rx=4/><circle cx=8.5 cy=8.5 r=1.3 fill=currentColor stroke=none/><circle cx=15.5 cy=15.5 r=1.3 fill=currentColor stroke=none/><circle cx=15.5 cy=8.5 r=1.3 fill=currentColor stroke=none/><circle cx=8.5 cy=15.5 r=1.3 fill=currentColor stroke=none/></svg></button>
+</div>
+
+<div class="panel" id=side></div>
+
+<div class="panel" id=stat>
+  <div class=cell><span class=k>X</span><span class="v mono" id=mx>0</span></div>
+  <div class=cell><span class=k>Z</span><span class="v mono" id=mz>0</span></div>
+  <div class=cell><span class=sw id=bsw></span><span class=v id=bname>—</span></div>
+  <div class=cell><span class=k>Scale</span><span class="v mono" id=scl>1:4</span></div>
+</div>
+
+<div class="panel" id=zoom>
+  <button id=zin title="Zoom in"><svg viewBox="0 0 24 24" fill=none stroke=currentColor stroke-width=2 stroke-linecap=round><path d="M12 5v14M5 12h14"/></svg></button>
+  <button id=zout title="Zoom out"><svg viewBox="0 0 24 24" fill=none stroke=currentColor stroke-width=2 stroke-linecap=round><path d="M5 12h14"/></svg></button>
+</div>
+<div class=hint id=hint>drag to pan · scroll to zoom · click a marker for coordinates</div>
+<div id=tip></div>
+
+<script src="cubiomes.js"></script>
+<script>
+//===================== icon paths (24x24, shared svg + canvas) =====================
+const ICOND={
+  biomes:'M4 7.5l5-2 6 2 5-2v11l-5 2-6-2-5 2zM9 5.5v11M15 7.5v11',
+  grid:'M3 9h18M3 15h18M9 3v18M15 3v18',
+  spawn:'M12 3.5v3.5M12 17v3.5M3.5 12h3.5M17 12h3.5M12 9a3 3 0 100 6 3 3 0 100-6',
+  stronghold:'M2.5 12c2.6-4.2 5.9-6 9.5-6s6.9 1.8 9.5 6c-2.6 4.2-5.9 6-9.5 6s-6.9-1.8-9.5-6zM12 9.3a2.7 2.7 0 100 5.4 2.7 2.7 0 100-5.4',
+  slime:'M12 3.5c3.4 0 5.7 2.7 5.7 5.7 0 4.2-3.1 8.8-5.7 8.8s-5.7-4.6-5.7-8.8c0-3 2.3-5.7 5.7-5.7zM9.7 9.3h.01M14.3 9.3h.01',
+  village:'M4 11l8-6 8 6M6 10v9h12v-9M10 19v-5h4v5',
+  outpost:'M7 21V3M7 4h11l-2.6 3.5L18 11H7',
+  monument:'M12 3v18M7 7l5-4 5 4M7 7v3.5M17 7v3.5M9 21h6',
+  mansion:'M3 11l9-7 9 7M5 10v9h14v-9M9 19v-6h6v6',
+  desert_pyramid:'M12 4L21 19H3zM8.5 19L12 12l3.5 7',
+  jungle_temple:'M4 20h16M6 20v-3.5h12V20M8 16.5V13h8v3.5M10 13v-3h4v3',
+  swamp_hut:'M5 10h14M7 10v7a2 2 0 002 2h6a2 2 0 002-2v-7M9.5 10V7.5a2.5 2.5 0 015 0V10',
+  igloo:'M3 18a9 9 0 0118 0zM9.5 18v-3.5a2.5 2.5 0 015 0V18',
+  ancient_city:'M12 3l3.5 4.5h-7zM12 7.5V21M8 12h8M9.5 21h5',
+  trial_chambers:'M5 5l6.5 6.5M5 8.5V5h3.5M19 5l-6.5 6.5M19 8.5V5h-3.5M8 19l4-4 4 4',
+  ruined_portal:'M6 21V9a6 6 0 0112 0v12M6 21h12M10 21v-8h4v8',
+  ruined_portal_n:'M6 21V9a6 6 0 0112 0v12M6 21h12M10 21v-8h4v8',
+  shipwreck:'M3.5 14h17l-2 5.5H5.5zM7.5 14V6l7.5 3-7.5 2M12 5.5V14',
+  ocean_ruin:'M9 4h6v3H9zM9 20h6v-3H9zM10.5 7v10M13.5 7v10',
+  treasure:'M4 9.5h16V19H4zM4 9.5l2-3h12l2 3M4 13.5h16M11 11.5h2V15h-2z',
+  trail_ruins:'M9.5 4h5M8.5 7h7l-1 9a2.5 2.5 0 01-5 0zM10 11.5h4',
+  fortress:'M4 20V8l3-2.5 3 2.5 4-3 4 3v12M4 20h16M9 20v-5h6v5',
+  bastion:'M12 3l7 3v6.5c0 4.6-4 7.6-7 8.5-3-.9-7-3.9-7-8.5V6z',
+  end_city:'M9 21V8.5l3-4.5 3 4.5V21M7 21h10M9.5 11.5h5M9.5 15.5h5',
+  copy:'M9 9h10v10H9zM5 15H4V4h11v1'
+};
+const ICONP={}; for(const k in ICOND) try{ICONP[k]=new Path2D(ICOND[k]);}catch(e){}
+function svgIc(k,col,sw){ return `<svg viewBox="0 0 24 24" fill=none stroke="${col||'currentColor'}" stroke-width="${sw||1.8}" stroke-linecap=round stroke-linejoin=round><path d="${ICOND[k]||''}"/></svg>`; }
+
+//===================== biome names =====================
+const BIOME={0:'Ocean',1:'Plains',2:'Desert',3:'Windswept Hills',4:'Forest',5:'Taiga',6:'Swamp',7:'River',
+8:'Nether Wastes',9:'The End',10:'Frozen Ocean',11:'Frozen River',12:'Snowy Plains',13:'Snowy Mountains',
+14:'Mushroom Fields',15:'Mushroom Shore',16:'Beach',17:'Desert Hills',18:'Wooded Hills',19:'Taiga Hills',
+20:'Mountain Edge',21:'Jungle',22:'Jungle Hills',23:'Sparse Jungle',24:'Deep Ocean',25:'Stony Shore',
+26:'Snowy Beach',27:'Birch Forest',28:'Birch Forest Hills',29:'Dark Forest',30:'Snowy Taiga',31:'Snowy Taiga Hills',
+32:'Old Growth Pine Taiga',33:'Giant Tree Taiga Hills',34:'Windswept Forest',35:'Savanna',36:'Savanna Plateau',
+37:'Badlands',38:'Wooded Badlands',39:'Badlands Plateau',40:'Small End Islands',41:'End Midlands',42:'End Highlands',
+43:'End Barrens',44:'Warm Ocean',45:'Lukewarm Ocean',46:'Cold Ocean',47:'Deep Warm Ocean',48:'Deep Lukewarm Ocean',
+49:'Deep Cold Ocean',50:'Deep Frozen Ocean',127:'The Void',129:'Sunflower Plains',130:'Desert Lakes',
+131:'Gravelly Hills',132:'Flower Forest',133:'Taiga Mountains',134:'Swamp Hills',140:'Ice Spikes',149:'Modified Jungle',
+151:'Modified Jungle Edge',155:'Old Growth Birch Forest',156:'Tall Birch Hills',157:'Dark Forest Hills',
+158:'Snowy Taiga Mountains',160:'Old Growth Spruce Taiga',162:'Modified Gravelly Hills',163:'Windswept Savanna',
+164:'Shattered Savanna Plateau',165:'Eroded Badlands',168:'Bamboo Jungle',169:'Bamboo Jungle Hills',
+170:'Soul Sand Valley',171:'Crimson Forest',172:'Warped Forest',173:'Basalt Deltas',174:'Dripstone Caves',
+175:'Lush Caves',177:'Meadow',178:'Grove',179:'Snowy Slopes',180:'Jagged Peaks',181:'Frozen Peaks',
+182:'Stony Peaks',183:'Deep Dark',184:'Mangrove Swamp',185:'Cherry Grove',186:'Pale Garden'};
+
+//===================== structures =====================
+const STRUCTS=[
+ {id:5,key:'village',name:'Village',col:'#cf9f57',dim:0,on:1},
+ {id:10,key:'outpost',name:'Pillager Outpost',col:'#b0584c',dim:0,on:1},
+ {id:8,key:'monument',name:'Ocean Monument',col:'#4aa9b0',dim:0,on:1},
+ {id:9,key:'mansion',name:'Woodland Mansion',col:'#9a6a45',dim:0,on:1},
+ {id:13,key:'ancient_city',name:'Ancient City',col:'#3f8f8a',dim:0,on:1},
+ {id:24,key:'trial_chambers',name:'Trial Chamber',col:'#c0863a',dim:0,on:0},
+ {id:1,key:'desert_pyramid',name:'Desert Pyramid',col:'#d6bd6a',dim:0,on:0},
+ {id:2,key:'jungle_temple',name:'Jungle Temple',col:'#5f9d56',dim:0,on:0},
+ {id:3,key:'swamp_hut',name:'Witch Hut',col:'#7d62a0',dim:0,on:0},
+ {id:4,key:'igloo',name:'Igloo',col:'#a8cdd9',dim:0,on:0},
+ {id:11,key:'ruined_portal',name:'Ruined Portal',col:'#9a5fc7',dim:0,on:0},
+ {id:7,key:'shipwreck',name:'Shipwreck',col:'#bb9a6b',dim:0,on:0},
+ {id:6,key:'ocean_ruin',name:'Ocean Ruin',col:'#5a8db5',dim:0,on:0},
+ {id:14,key:'treasure',name:'Buried Treasure',col:'#62c294',dim:0,on:0},
+ {id:23,key:'trail_ruins',name:'Trail Ruins',col:'#a8825f',dim:0,on:0},
+ {id:18,key:'fortress',name:'Nether Fortress',col:'#a23b3b',dim:-1,on:1},
+ {id:19,key:'bastion',name:'Bastion Remnant',col:'#7a7a82',dim:-1,on:1},
+ {id:12,key:'ruined_portal_n',name:'Ruined Portal',col:'#9a5fc7',dim:-1,on:1},
+ {id:20,key:'end_city',name:'End City',col:'#b6a4dd',dim:1,on:1},
+];
+
+//===================== state =====================
+let M=null,F={},palette=null,cacheBuf=0,cacheCells=0;
+let mc=0,seedU=0n,dim=0;
+const cv=document.getElementById('map'),ctx=cv.getContext('2d',{alpha:false});
+const cam={x:0,z:0,ppb:0.18};
+let VW=innerWidth||1280, VH=innerHeight||720;
+const tiles=new Map(); const TILE=64;
+let structs={}, spawn=null, holds=[];
+const opt={biomes:true,grid:false,spawn:true,holds:true,slime:false,struct:{}};
+STRUCTS.forEach(s=>opt.struct[s.key]=!!s.on);
+let dirty=true,structDirty=true;
+const MARKERS=[
+  {key:'spawn',name:'World Spawn',col:'#79c8a0',get:k=>opt.spawn},
+  {key:'stronghold',name:'Stronghold',col:'#a172d6',get:k=>opt.holds},
+];
+
+//===================== wasm =====================
+CubiomesModule().then(mod=>{
+  M=mod;
+  F.str2mc=s=>M.ccall('wasm_str2mc','number',['string'],[s]);
+  F.setup=(mc,hi,lo,d)=>M.ccall('wasm_setup',null,['number','number','number','number'],[mc,hi,lo,d]);
+  F.csize=(sc,sx,sz)=>M.ccall('wasm_cache_size','number',['number','number','number'],[sc,sx,sz]);
+  F.gen=(sc,x,z,sx,sz,y,p)=>M.ccall('wasm_gen_biomes','number',['number','number','number','number','number','number','number'],[sc,x,z,sx,sz,y,p]);
+  F.find=(st,x0,z0,x1,z1,p,mx)=>M.ccall('wasm_find_structures','number',['number','number','number','number','number','number','number'],[st,x0,z0,x1,z1,p,mx]);
+  F.spawn=p=>M.ccall('wasm_spawn',null,['number'],[p]);
+  F.holds=(p,n)=>M.ccall('wasm_strongholds','number',['number','number'],[p,n]);
+  F.colors=()=>M.ccall('wasm_biome_colors','number',[],[]);
+  buildVersions(); buildSide();
+  document.getElementById('load').style.display='none';
+  resize();
+  regen(document.getElementById('seed').value);
+  requestAnimationFrame(loop);
+});
+
+//===================== seed =====================
+function parseSeed(str){
+  str=(str||'').trim();
+  if(str===''){ const a=BigInt(Math.floor(Math.random()*4294967296)),b=BigInt(Math.floor(Math.random()*4294967296)); return (a<<32n)|b; }
+  if(/^-?\d+$/.test(str)){ try{ return BigInt.asUintN(64,BigInt.asIntN(64,BigInt(str))); }catch(e){} }
+  let h=0; for(let i=0;i<str.length;i++) h=Math.imul(31,h)+str.charCodeAt(i)|0;
+  return BigInt.asUintN(64,BigInt(h));
+}
+function regen(seedStr){
+  if(!M) return;
+  seedU=parseSeed(seedStr);
+  mc=F.str2mc(document.getElementById('ver').value);
+  dim=parseInt(document.getElementById('dim').value);
+  F.setup(mc,Number((seedU>>32n)&0xffffffffn),Number(seedU&0xffffffffn),dim);
+  if(!palette){ const p=F.colors(); palette=M.HEAPU8.slice(p,p+768); }
+  tiles.clear(); structs={}; structDirty=true;
+  if(dim===0){
+    const sp=M._malloc(8); F.spawn(sp); spawn={x:M.HEAP32[sp>>2],z:M.HEAP32[(sp>>2)+1]}; M._free(sp);
+    const hp=M._malloc(128*8); const n=F.holds(hp,128); holds=[];
+    for(let i=0;i<n;i++) holds.push({x:M.HEAP32[(hp>>2)+i*2],z:M.HEAP32[(hp>>2)+i*2+1]}); M._free(hp);
+    cam.x=spawn.x; cam.z=spawn.z;
+  }else{ spawn=null; holds=[]; cam.x=0; cam.z=0; }
+  dirty=true;
+}
+
+//===================== rendering =====================
+function chooseScale(ppb){ const need=1/ppb; for(const s of [1,4,16,64,256]) if(s>=need*0.9) return s; return 256; }
+function getTile(scale,tx,tz,y){
+  const key=scale+'/'+tx+'/'+tz; let t=tiles.get(key); if(t) return t;
+  const need=F.csize(scale,TILE,TILE);
+  if(need>cacheCells){ if(cacheBuf)M._free(cacheBuf); cacheBuf=M._malloc(need*4); cacheCells=need; }
+  F.gen(scale,tx*TILE,tz*TILE,TILE,TILE,y,cacheBuf);
+  const ids=M.HEAP32.slice(cacheBuf>>2,(cacheBuf>>2)+TILE*TILE);
+  const tc=document.createElement('canvas'); tc.width=TILE; tc.height=TILE;
+  const c2=tc.getContext('2d'); const img=c2.createImageData(TILE,TILE),d=img.data;
+  for(let i=0;i<TILE*TILE;i++){ let id=ids[i]; if(id<0||id>255)id=0; const c=id*3;
+    d[i*4]=palette[c]; d[i*4+1]=palette[c+1]; d[i*4+2]=palette[c+2]; d[i*4+3]=255; }
+  c2.putImageData(img,0,0);
+  t={cv:tc,ids}; tiles.set(key,t);
+  if(tiles.size>900){ tiles.delete(tiles.keys().next().value); }
+  return t;
+}
+function render(){
+  const W=VW,H=VH,ppb=cam.ppb;
+  ctx.fillStyle='#0c0d11'; ctx.fillRect(0,0,W,H);
+  const scale=chooseScale(ppb), y=(dim===-1)?15:(scale===1?63:15);
+  document.getElementById('scl').textContent='1:'+scale;
+  const bx0=cam.x-(W/2)/ppb, bz0=cam.z-(H/2)/ppb, bx1=cam.x+(W/2)/ppb, bz1=cam.z+(H/2)/ppb;
+  const cx0=Math.floor(bx0/scale),cx1=Math.ceil(bx1/scale),cz0=Math.floor(bz0/scale),cz1=Math.ceil(bz1/scale);
+  const tx0=Math.floor(cx0/TILE),tx1=Math.floor(cx1/TILE),tz0=Math.floor(cz0/TILE),tz1=Math.floor(cz1/TILE);
+  ctx.imageSmoothingEnabled=false;
+  if(opt.biomes){ let cnt=0; for(let tz=tz0;tz<=tz1;tz++){ for(let tx=tx0;tx<=tx1;tx++){ if(cnt++>200) break;
+    const t=getTile(scale,tx,tz,y); const bX=tx*TILE*scale,bZ=tz*TILE*scale;
+    const sx=W/2+(bX-cam.x)*ppb, sy=H/2+(bZ-cam.z)*ppb, sz=TILE*scale*ppb;
+    ctx.drawImage(t.cv,Math.floor(sx),Math.floor(sy),Math.ceil(sz),Math.ceil(sz)); } } }
+  if(opt.slime && dim===0 && ppb>=0.45) drawSlime(W,H,ppb,bx0,bz0,bx1,bz1);
+  if(opt.grid && ppb>=0.05) drawGrid(W,H,ppb,bx0,bz0);
+  drawMarkers(W,H,ppb);
+}
+function w2s(x,z,W,H,ppb){ return [W/2+(x-cam.x)*ppb, H/2+(z-cam.z)*ppb]; }
+function drawSlime(W,H,ppb,bx0,bz0,bx1,bz1){
+  const cx0=Math.floor(bx0/16),cx1=Math.ceil(bx1/16),cz0=Math.floor(bz0/16),cz1=Math.ceil(bz1/16);
+  ctx.fillStyle='rgba(121,200,160,.26)'; ctx.strokeStyle='rgba(121,200,160,.5)'; ctx.lineWidth=1;
+  for(let cz=cz0;cz<=cz1;cz++) for(let cx=cx0;cx<=cx1;cx++){ if(!isSlime(seedU,cx,cz)) continue;
+    const [sx,sy]=w2s(cx*16,cz*16,W,H,ppb),s=16*ppb; ctx.fillRect(sx,sy,s,s); ctx.strokeRect(sx+.5,sy+.5,s-1,s-1); }
+}
+function drawGrid(W,H,ppb,bx0,bz0){
+  ctx.strokeStyle='rgba(255,255,255,.05)'; ctx.lineWidth=1; ctx.beginPath();
+  const step=(ppb>=0.5)?16:(ppb>=0.1?64:512);
+  for(let gx=Math.floor(bx0/step)*step; gx<bx0+W/ppb+step; gx+=step){ const [sx]=w2s(gx,0,W,H,ppb); ctx.moveTo(sx,0); ctx.lineTo(sx,H); }
+  for(let gz=Math.floor(bz0/step)*step; gz<bz0+H/ppb+step; gz+=step){ const [,sy]=w2s(0,gz,W,H,ppb); ctx.moveTo(0,sy); ctx.lineTo(W,sy); }
+  ctx.stroke();
+}
+function lum(hex){ const c=hex.replace('#',''); return 0.2126*parseInt(c.substr(0,2),16)+0.7152*parseInt(c.substr(2,2),16)+0.0722*parseInt(c.substr(4,2),16); }
+function drawChip(key,sx,sy,col,s){
+  const gl=lum(col)>150?'rgba(18,20,26,.92)':'rgba(255,255,255,.96)';
+  ctx.save();
+  const r=s*0.42; ctx.beginPath();
+  ctx.moveTo(sx-s+r,sy-s); ctx.arcTo(sx+s,sy-s,sx+s,sy+s,r); ctx.arcTo(sx+s,sy+s,sx-s,sy+s,r);
+  ctx.arcTo(sx-s,sy+s,sx-s,sy-s,r); ctx.arcTo(sx-s,sy-s,sx+s,sy-s,r); ctx.closePath();
+  ctx.fillStyle=col; ctx.fill(); ctx.lineWidth=1; ctx.strokeStyle='rgba(0,0,0,.45)'; ctx.stroke();
+  const p=ICONP[key];
+  if(p){ const g=(s*2)/24*0.78; ctx.translate(sx-12*g,sy-12*g); ctx.scale(g,g);
+    ctx.strokeStyle=gl; ctx.lineWidth=2; ctx.lineJoin='round'; ctx.lineCap='round'; ctx.stroke(p); }
+  ctx.restore();
+}
+let hits=[];
+function drawMarkers(W,H,ppb){
+  hits=[];
+  if(dim===0 && opt.holds) holds.forEach(h=>marker('stronghold',h.x,h.z,'#a172d6','Stronghold',W,H,ppb));
+  STRUCTS.forEach(s=>{ if(s.dim!==dim||!opt.struct[s.key]) return;
+    (structs[s.key]||[]).forEach(p=>marker(s.key,p.x,p.z,s.col,s.name,W,H,ppb)); });
+  if(dim===0 && opt.spawn && spawn) marker('spawn',spawn.x,spawn.z,'#79c8a0','World Spawn',W,H,ppb,true);
+}
+function marker(key,x,z,col,name,W,H,ppb,big){
+  const [sx,sy]=w2s(x,z,W,H,ppb);
+  if(sx<-24||sy<-24||sx>W+24||sy>H+24) return;
+  const showIcon = ppb>=0.018 || big;
+  if(showIcon){ drawChip(key,sx,sy,col,big?11:10); hits.push({sx,sy,r:big?13:12,name,x,z,key,col}); }
+  else { ctx.beginPath(); ctx.arc(sx,sy,3,0,7); ctx.fillStyle=col; ctx.fill(); hits.push({sx,sy,r:6,name,x,z,key,col}); }
+}
+
+//===================== slime =====================
+function isSlime(seed,cx,cz){
+  const mask=(1n<<48n)-1n;
+  let e=(seed + BigInt(Math.imul(Math.imul(cx,cx),0x4c1906)) + BigInt(Math.imul(cx,0x5ac0db))
+    + BigInt(Math.imul(cz,cz))*0x4307a7n + BigInt(Math.imul(cz,0x5f24f))) ^ 0x3ad8025fn;
+  let s=(BigInt.asUintN(64,e) ^ 0x5deece66dn)&mask;
+  const next=b=>{ s=(s*0x5deece66dn+0xbn)&mask; return Number(BigInt.asIntN(32,s>>(48n-BigInt(b)))); };
+  let bits=next(31),val=bits%10; while(bits-val+9<0){ bits=next(31); val=bits%10; } return val===0;
+}
+
+//===================== structures scan =====================
+function scanStructures(){
+  if(!M) return; const ppb=cam.ppb, m=400/ppb;
+  const x0=Math.floor(cam.x-(VW/2)/ppb-m),x1=Math.ceil(cam.x+(VW/2)/ppb+m);
+  const z0=Math.floor(cam.z-(VH/2)/ppb-m),z1=Math.ceil(cam.z+(VH/2)/ppb+m);
+  const area=(x1-x0)*(z1-z0); const p=M._malloc(4096*8);
+  STRUCTS.forEach(s=>{ if(s.dim!==dim||!opt.struct[s.key]){ structs[s.key]=[]; return; }
+    if(area>3.2e9){ structs[s.key]=[]; return; }
+    const n=F.find(s.id,x0,z0,x1,z1,p,4096),a=[];
+    for(let i=0;i<n;i++) a.push({x:M.HEAP32[(p>>2)+i*2],z:M.HEAP32[(p>>2)+i*2+1]}); structs[s.key]=a; });
+  M._free(p);
+}
+
+//===================== loop =====================
+let lastScan='';
+function loop(){
+  if(dirty){ const sk=Math.round(cam.x)+'/'+Math.round(cam.z)+'/'+cam.ppb.toFixed(4)+'/'+dim;
+    if(structDirty||sk!==lastScan){ scanStructures(); lastScan=sk; structDirty=false; } render(); dirty=false; }
+  requestAnimationFrame(loop);
+}
+
+//===================== interaction =====================
+function resize(){
+  VW=innerWidth||document.documentElement.clientWidth||1280;
+  VH=innerHeight||document.documentElement.clientHeight||720;
+  const dpr=devicePixelRatio||1;
+  cv.width=Math.round(VW*dpr); cv.height=Math.round(VH*dpr);
+  cv.style.width=VW+'px'; cv.style.height=VH+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0); dirty=true;
+}
+addEventListener('resize',resize); resize(); addEventListener('load',resize);
+if(window.ResizeObserver) new ResizeObserver(resize).observe(document.documentElement);
+
+let drag=null;
+cv.addEventListener('pointerdown',e=>{ hideTip(); drag={x:e.clientX,y:e.clientY,cx:cam.x,cz:cam.z,moved:0}; cv.classList.add('drag'); cv.setPointerCapture(e.pointerId); });
+cv.addEventListener('pointermove',e=>{
+  const mb=screenToBlock(e.clientX,e.clientY);
+  document.getElementById('mx').textContent=Math.floor(mb.x); document.getElementById('mz').textContent=Math.floor(mb.z);
+  updateBiome(mb.x,mb.z);
+  if(drag){ const dx=e.clientX-drag.x,dy=e.clientY-drag.y; drag.moved+=Math.abs(dx)+Math.abs(dy);
+    cam.x=drag.cx-dx/cam.ppb; cam.z=drag.cz-dy/cam.ppb; dirty=true; }
+});
+addEventListener('pointerup',e=>{ if(drag){ if(drag.moved<5) clickAt(e.clientX,e.clientY); drag=null; cv.classList.remove('drag'); }});
+cv.addEventListener('wheel',e=>{ e.preventDefault();
+  const a=screenToBlock(e.clientX,e.clientY); cam.ppb=Math.max(0.004,Math.min(24,cam.ppb*(e.deltaY<0?1.18:1/1.18)));
+  const b=screenToBlock(e.clientX,e.clientY); cam.x+=a.x-b.x; cam.z+=a.z-b.z; dirty=true;
+  const h=document.getElementById('hint'); h.style.opacity=0;
+},{passive:false});
+function screenToBlock(px,py){ const r=cv.getBoundingClientRect(); return {x:cam.x+(px-r.left-VW/2)/cam.ppb, z:cam.z+(py-r.top-VH/2)/cam.ppb}; }
+function updateBiome(bx,bz){
+  const scale=chooseScale(cam.ppb),cx=Math.floor(bx/scale),cz=Math.floor(bz/scale);
+  const t=tiles.get(scale+'/'+Math.floor(cx/TILE)+'/'+Math.floor(cz/TILE)); if(!t) return;
+  const lx=((cx%TILE)+TILE)%TILE,lz=((cz%TILE)+TILE)%TILE; let id=t.ids[lz*TILE+lx]; if(id<0)id=0;
+  document.getElementById('bname').textContent=BIOME[id]||('Biome '+id);
+  const c=id*3; document.getElementById('bsw').style.background=`rgb(${palette[c]},${palette[c+1]},${palette[c+2]})`;
+}
+function clickAt(px,py){ const r=cv.getBoundingClientRect(),sx=px-r.left,sy=py-r.top; let best=null,bd=1e9;
+  for(const h of hits){ const d=Math.hypot(h.sx-sx,h.sy-sy); if(d<h.r+5&&d<bd){bd=d;best=h;} }
+  if(best) showTip(px,py,best); else hideTip();
+}
+function showTip(px,py,h){
+  const t=document.getElementById('tip');
+  t.innerHTML=`<div class=t><span class=gi style="background:${h.col}">${svgIc(h.key,lum(h.col)>150?'#12141a':'#fff',2)}</span>${h.name}</div>`+
+    `<div class="c mono">X ${h.x}  ·  Z ${h.z}</div>`+
+    `<div class=tp>${svgIc('copy','currentColor',1.8)} copy /tp ${h.x} ~ ${h.z}</div>`;
+  t.style.display='block'; const w=t.offsetWidth,ht=t.offsetHeight;
+  t.style.left=Math.min(px+14,innerWidth-w-10)+'px'; t.style.top=Math.min(py+14,innerHeight-ht-10)+'px';
+  t.querySelector('.tp').onclick=()=>{ try{navigator.clipboard.writeText('/tp @s '+h.x+' ~ '+h.z);}catch(e){}
+    t.querySelector('.tp').innerHTML=svgIc('copy','currentColor',1.8)+' copied'; };
+}
+function hideTip(){ document.getElementById('tip').style.display='none'; }
+
+//===================== ui =====================
+function buildVersions(){ const sel=document.getElementById('ver'); sel.innerHTML='';
+  ['1.21','1.20','1.19','1.18','1.17','1.16','1.15','1.14','1.13','1.12'].forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent='MC '+v;sel.appendChild(o);}); sel.value='1.21'; }
+function row(k,nm,col,on,kind){ return `<div class="it ${on?'on':''}" data-${kind}="${k}"><span class=gi>${svgIc(k,col||'var(--accent)',1.8)}</span><span class=nm>${nm}</span><span class=ck></span></div>`; }
+function buildSide(){
+  const el=document.getElementById('side');
+  let h='<div class=grp><h4>Map</h4>'+row('biomes','Biomes',null,opt.biomes,'o')+row('grid','Grid',null,opt.grid,'o')+'</div>';
+  h+='<div class=grp><h4>Markers</h4>'+row('spawn','World Spawn','#79c8a0',opt.spawn,'o')+row('stronghold','Strongholds','#a172d6',opt.holds,'o')+row('slime','Slime Chunks','#79c8a0',opt.slime,'o')+'</div>';
+  h+='<div class=grp><h4>Structures</h4>'+STRUCTS.map(s=>row(s.key,s.name,s.col,opt.struct[s.key],'s')).join('')+'</div>';
+  el.innerHTML=h;
+  el.querySelectorAll('[data-o]').forEach(r=>r.onclick=()=>{ const k=r.dataset.o,m={biomes:'biomes',grid:'grid',spawn:'spawn',stronghold:'holds',slime:'slime'}[k];
+    opt[m]=!opt[m]; r.classList.toggle('on',opt[m]); dirty=true; if(k==='slime')structDirty=true; });
+  el.querySelectorAll('[data-s]').forEach(r=>r.onclick=()=>{ const k=r.dataset.s; opt.struct[k]=!opt.struct[k]; r.classList.toggle('on',opt.struct[k]); structDirty=true; dirty=true; });
+}
+
+//===================== controls =====================
+const $=id=>document.getElementById(id);
+$('go').onclick=()=>regen($('seed').value);
+$('seed').addEventListener('keydown',e=>{if(e.key==='Enter')regen(e.target.value);});
+$('ver').onchange=()=>regen($('seed').value);
+$('dim').onchange=()=>regen($('seed').value);
+$('rand').onclick=()=>{ $('seed').value=''; regen(''); $('seed').value=BigInt.asIntN(64,seedU).toString(); };
+$('zin').onclick=()=>{cam.ppb=Math.min(24,cam.ppb*1.5);dirty=true;};
+$('zout').onclick=()=>{cam.ppb=Math.max(0.004,cam.ppb/1.5);dirty=true;};
+const q=new URLSearchParams(location.search); if(q.get('seed')!==null) $('seed').value=q.get('seed');
+</script>
+</body>
+</html>
