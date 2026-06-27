@@ -75,12 +75,19 @@ select:hover{border-color:var(--line2)}
 #stat .v{font-size:13px;font-weight:500}
 #stat .sw{width:12px;height:12px;border-radius:3px;border:1px solid rgba(255,255,255,.18);flex:0 0 12px}
 
-/* zoom */
-#zoom{bottom:16px;right:16px;display:flex;flex-direction:column;z-index:15;overflow:hidden;padding:0}
-#zoom button{width:40px;height:40px;background:none;border:0;color:var(--dim);cursor:pointer;display:grid;place-items:center}
-#zoom button:hover{background:var(--panel2);color:var(--txt)}
-#zoom button:first-child{border-bottom:1px solid var(--line)}
-#zoom svg{width:16px;height:16px}
+/* bottom-right controls */
+#controls{bottom:16px;right:16px;display:flex;flex-direction:column;z-index:16;overflow:hidden;padding:0}
+#controls button{width:40px;height:40px;background:none;border:0;color:var(--dim);cursor:pointer;display:grid;place-items:center}
+#controls button:hover{background:var(--panel2);color:var(--txt)}
+#controls button+button{border-top:1px solid var(--line)}
+#controls svg{width:16px;height:16px}
+/* coord inputs */
+.coordin{background:none;border:0;outline:0;color:var(--txt);font-family:inherit;font-size:13px;font-weight:500;
+  width:60px;padding:2px 5px;border-radius:5px}
+.coordin:focus{background:var(--bg);box-shadow:inset 0 0 0 1px var(--line2)}
+.coordin::-webkit-outer-spin-button,.coordin::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+/* hide-ui mode */
+body.noui #bar,body.noui #side,body.noui #stat,body.noui #hint,body.noui #zin,body.noui #zout{display:none!important}
 
 /* tooltip */
 #tip{position:fixed;z-index:30;background:var(--panel2);border:1px solid var(--line2);border-radius:10px;
@@ -123,15 +130,16 @@ select:hover{border-color:var(--line2)}
 <div class="panel" id=side></div>
 
 <div class="panel" id=stat>
-  <div class=cell><span class=k>X</span><span class="v mono" id=mx>0</span></div>
-  <div class=cell><span class=k>Z</span><span class="v mono" id=mz>0</span></div>
+  <div class=cell><span class=k>X</span><input class="mono coordin" id=mx value=0 inputmode=numeric autocomplete=off spellcheck=false title="type X, Enter to jump"></div>
+  <div class=cell><span class=k>Z</span><input class="mono coordin" id=mz value=0 inputmode=numeric autocomplete=off spellcheck=false title="type Z, Enter to jump"></div>
   <div class=cell><span class=sw id=bsw></span><span class=v id=bname>—</span></div>
   <div class=cell><span class=k>Scale</span><span class="v mono" id=scl>1:4</span></div>
 </div>
 
-<div class="panel" id=zoom>
+<div class="panel" id=controls>
   <button id=zin title="Zoom in"><svg viewBox="0 0 24 24" fill=none stroke=currentColor stroke-width=2 stroke-linecap=round><path d="M12 5v14M5 12h14"/></svg></button>
   <button id=zout title="Zoom out"><svg viewBox="0 0 24 24" fill=none stroke=currentColor stroke-width=2 stroke-linecap=round><path d="M5 12h14"/></svg></button>
+  <button id=hideui title="Hide UI (H)"></button>
 </div>
 <div class=hint id=hint>drag to pan · scroll to zoom · click a marker for coordinates</div>
 <div id=tip></div>
@@ -178,7 +186,9 @@ function buildSprites(){
     SPRIMG[k]=c; SPRURL[k]=c.toDataURL();
   }
 }
-function imgIc(k,px){ return `<img src="${SPRURL[k]||''}" width="${px||18}" height="${px||18}" style="image-rendering:pixelated;display:block">`; }
+function imgIc(k,px){ const s=px||18; return `<img src="icons/${k}.png" onerror="this.onerror=null;this.src='${SPRURL[k]||''}'" width="${s}" height="${s}" style="image-rendering:pixelated;display:block">`; }
+const IMG={};
+function loadIcons(){ for(const k in SPR){ const im=new Image(); im.onload=()=>{IMG[k]=im;dirty=true;}; im.src='icons/'+k+'.png'; } }
 
 //===================== biome names =====================
 const BIOME={0:'Ocean',1:'Plains',2:'Desert',3:'Windswept Hills',4:'Forest',5:'Taiga',6:'Swamp',7:'River',
@@ -249,7 +259,7 @@ CubiomesModule().then(mod=>{
   F.holds=(p,n)=>M.ccall('wasm_strongholds','number',['number','number'],[p,n]);
   F.colors=()=>M.ccall('wasm_biome_colors','number',[],[]);
   F.newest=()=>M.ccall('wasm_newest','number',[],[]);
-  buildSprites(); buildVersions(); buildSide();
+  buildSprites(); loadIcons(); buildVersions(); buildSide();
   document.getElementById('load').style.display='none';
   resize();
   regen(document.getElementById('seed').value);
@@ -332,7 +342,7 @@ function drawGrid(W,H,ppb,bx0,bz0){
 }
 function lum(hex){ const c=hex.replace('#',''); return 0.2126*parseInt(c.substr(0,2),16)+0.7152*parseInt(c.substr(2,2),16)+0.0722*parseInt(c.substr(4,2),16); }
 function drawSprite(key,sx,sy,size){
-  const img=SPRIMG[key]; if(!img) return;
+  const img=IMG[key]||SPRIMG[key]; if(!img) return;
   ctx.save();
   const s=size/2, r=size*0.26;
   ctx.beginPath();
@@ -404,7 +414,8 @@ let drag=null;
 cv.addEventListener('pointerdown',e=>{ hideTip(); drag={x:e.clientX,y:e.clientY,cx:cam.x,cz:cam.z,moved:0}; cv.classList.add('drag'); cv.setPointerCapture(e.pointerId); });
 cv.addEventListener('pointermove',e=>{
   const mb=screenToBlock(e.clientX,e.clientY);
-  document.getElementById('mx').textContent=Math.floor(mb.x); document.getElementById('mz').textContent=Math.floor(mb.z);
+  if(!(document.activeElement&&document.activeElement.classList.contains('coordin'))){
+    document.getElementById('mx').value=Math.floor(mb.x); document.getElementById('mz').value=Math.floor(mb.z); }
   updateBiome(mb.x,mb.z);
   if(drag){ const dx=e.clientX-drag.x,dy=e.clientY-drag.y; drag.moved+=Math.abs(dx)+Math.abs(dy);
     cam.x=drag.cx-dx/cam.ppb; cam.z=drag.cz-dy/cam.ppb; dirty=true; queueScan(); }
@@ -463,6 +474,17 @@ $('dim').onchange=()=>regen($('seed').value);
 $('rand').onclick=()=>{ $('seed').value=''; regen(''); $('seed').value=BigInt.asIntN(64,seedU).toString(); };
 $('zin').onclick=()=>{cam.ppb=Math.min(24,cam.ppb*1.5);dirty=true;queueScan();};
 $('zout').onclick=()=>{cam.ppb=Math.max(0.004,cam.ppb/1.5);dirty=true;queueScan();};
+// typeable coords
+const mxEl=$('mx'),mzEl=$('mz');
+function gotoCoords(){ const nx=parseFloat(mxEl.value),nz=parseFloat(mzEl.value); if(!isNaN(nx))cam.x=nx; if(!isNaN(nz))cam.z=nz; dirty=true; queueScan(); }
+[mxEl,mzEl].forEach(el=>el.addEventListener('keydown',e=>{ if(e.key==='Enter'){ gotoCoords(); el.blur(); } }));
+// hide-ui toggle
+const EYE='<svg viewBox="0 0 24 24" fill=none stroke=currentColor stroke-width=1.7 stroke-linecap=round stroke-linejoin=round><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx=12 cy=12 r=3/></svg>';
+const EYEOFF='<svg viewBox="0 0 24 24" fill=none stroke=currentColor stroke-width=1.7 stroke-linecap=round stroke-linejoin=round><path d="M3 3l18 18M10.6 5.1A11 11 0 0112 5c6.5 0 10 7 10 7a18 18 0 01-3.1 4M6.6 6.6A18 18 0 002 12s3.5 7 10 7a11 11 0 004.5-1"/></svg>';
+const hk=$('hideui'); hk.innerHTML=EYE;
+function toggleUI(){ const off=document.body.classList.toggle('noui'); hk.innerHTML=off?EYEOFF:EYE; hk.title=off?'Show UI (H)':'Hide UI (H)'; }
+hk.onclick=toggleUI;
+addEventListener('keydown',e=>{ const t=document.activeElement; if((e.key==='h'||e.key==='H')&&!(t&&(t.classList.contains('coordin')||t.id==='seed'))) toggleUI(); });
 const q=new URLSearchParams(location.search); if(q.get('seed')!==null) $('seed').value=q.get('seed');
 </script>
 </body>
