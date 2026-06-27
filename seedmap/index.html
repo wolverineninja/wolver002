@@ -259,12 +259,32 @@ CubiomesModule().then(mod=>{
   F.holds=(p,n)=>M.ccall('wasm_strongholds','number',['number','number'],[p,n]);
   F.colors=()=>M.ccall('wasm_biome_colors','number',[],[]);
   F.newest=()=>M.ccall('wasm_newest','number',[],[]);
-  buildSprites(); loadIcons(); buildVersions(); buildSide();
+  buildSprites(); loadIcons(); buildVersions();
+  const saved=loadState();
+  if(saved){
+    if(saved.struct) Object.assign(opt.struct, saved.struct);
+    ['biomes','grid','spawn','holds','slime'].forEach(k=>{ if(typeof saved[k]==='boolean') opt[k]=saved[k]; });
+    const verSel=document.getElementById('ver');
+    if(saved.ver && [...verSel.options].some(o=>o.value===saved.ver)) verSel.value=saved.ver;
+    if(saved.dim!=null) document.getElementById('dim').value=saved.dim;
+  }
+  buildSide();
+  const q=new URLSearchParams(location.search);
+  if(q.get('v')) document.getElementById('ver').value=q.get('v');
+  if(q.get('seed')!==null) document.getElementById('seed').value=q.get('seed');
+  else if(saved && saved.seed) document.getElementById('seed').value=saved.seed;
   document.getElementById('load').style.display='none';
   resize();
   regen(document.getElementById('seed').value);
   requestAnimationFrame(loop);
 });
+
+//===================== persistence =====================
+const LSKEY='wolver-seedmap-v1';
+function saveState(){ try{ localStorage.setItem(LSKEY, JSON.stringify({
+  seed:document.getElementById('seed').value, ver:document.getElementById('ver').value, dim:document.getElementById('dim').value,
+  biomes:opt.biomes, grid:opt.grid, spawn:opt.spawn, holds:opt.holds, slime:opt.slime, struct:opt.struct })); }catch(e){} }
+function loadState(){ try{ return JSON.parse(localStorage.getItem(LSKEY)); }catch(e){ return null; } }
 
 //===================== seed =====================
 function parseSeed(str){
@@ -289,7 +309,7 @@ function regen(seedStr){
     for(let i=0;i<n;i++) holds.push({x:M.HEAP32[(hp>>2)+i*2],z:M.HEAP32[(hp>>2)+i*2+1]}); M._free(hp);
     cam.x=spawn.x; cam.z=spawn.z;
   }else{ spawn=null; holds=[]; cam.x=0; cam.z=0; }
-  scanStructures(); dirty=true;
+  scanStructures(); dirty=true; saveState();
 }
 
 //===================== rendering =====================
@@ -458,11 +478,14 @@ function buildSide(){
   const el=document.getElementById('side');
   let h='<div class=grp><h4>Map</h4>'+row('biomes','Biomes',null,opt.biomes,'o')+row('grid','Grid',null,opt.grid,'o')+'</div>';
   h+='<div class=grp><h4>Markers</h4>'+row('spawn','World Spawn','#79c8a0',opt.spawn,'o')+row('stronghold','Strongholds','#a172d6',opt.holds,'o')+row('slime','Slime Chunks','#79c8a0',opt.slime,'o')+'</div>';
-  h+='<div class=grp><h4>Structures</h4>'+STRUCTS.map(s=>row(s.key,s.name,s.col,opt.struct[s.key],'s')).join('')+'</div>';
+  [[0,'Overworld Structures'],[-1,'Nether Structures'],[1,'End Structures']].forEach(([dv,label])=>{
+    const rows=STRUCTS.filter(s=>s.dim===dv); if(!rows.length) return;
+    h+='<div class=grp><h4>'+label+'</h4>'+rows.map(s=>row(s.key,s.name,s.col,opt.struct[s.key],'s')).join('')+'</div>';
+  });
   el.innerHTML=h;
   el.querySelectorAll('[data-o]').forEach(r=>r.onclick=()=>{ const k=r.dataset.o,m={biomes:'biomes',grid:'grid',spawn:'spawn',stronghold:'holds',slime:'slime'}[k];
-    opt[m]=!opt[m]; r.classList.toggle('on',opt[m]); dirty=true; });
-  el.querySelectorAll('[data-s]').forEach(r=>r.onclick=()=>{ const k=r.dataset.s; opt.struct[k]=!opt.struct[k]; r.classList.toggle('on',opt.struct[k]); scanStructures(); dirty=true; });
+    opt[m]=!opt[m]; r.classList.toggle('on',opt[m]); dirty=true; saveState(); });
+  el.querySelectorAll('[data-s]').forEach(r=>r.onclick=()=>{ const k=r.dataset.s; opt.struct[k]=!opt.struct[k]; r.classList.toggle('on',opt.struct[k]); scanStructures(); dirty=true; saveState(); });
 }
 
 //===================== controls =====================
@@ -471,7 +494,7 @@ $('go').onclick=()=>regen($('seed').value);
 $('seed').addEventListener('keydown',e=>{if(e.key==='Enter')regen(e.target.value);});
 $('ver').onchange=()=>regen($('seed').value);
 $('dim').onchange=()=>regen($('seed').value);
-$('rand').onclick=()=>{ $('seed').value=''; regen(''); $('seed').value=BigInt.asIntN(64,seedU).toString(); };
+$('rand').onclick=()=>{ $('seed').value=''; regen(''); $('seed').value=BigInt.asIntN(64,seedU).toString(); saveState(); };
 $('zin').onclick=()=>{cam.ppb=Math.min(24,cam.ppb*1.5);dirty=true;queueScan();};
 $('zout').onclick=()=>{cam.ppb=Math.max(0.004,cam.ppb/1.5);dirty=true;queueScan();};
 // typeable coords
@@ -485,7 +508,6 @@ const hk=$('hideui'); hk.innerHTML=EYE;
 function toggleUI(){ const off=document.body.classList.toggle('noui'); hk.innerHTML=off?EYEOFF:EYE; hk.title=off?'Show UI (H)':'Hide UI (H)'; }
 hk.onclick=toggleUI;
 addEventListener('keydown',e=>{ const t=document.activeElement; if((e.key==='h'||e.key==='H')&&!(t&&(t.classList.contains('coordin')||t.id==='seed'))) toggleUI(); });
-const q=new URLSearchParams(location.search); if(q.get('seed')!==null) $('seed').value=q.get('seed');
 </script>
 </body>
 </html>
