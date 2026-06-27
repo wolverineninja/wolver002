@@ -231,7 +231,7 @@ const tiles=new Map(); const TILE=64;
 let structs={}, spawn=null, holds=[];
 const opt={biomes:true,grid:false,spawn:true,holds:true,slime:false,struct:{}};
 STRUCTS.forEach(s=>opt.struct[s.key]=!!s.on);
-let dirty=true,structDirty=true;
+let dirty=true;
 const MARKERS=[
   {key:'spawn',name:'World Spawn',col:'#79c8a0',get:k=>opt.spawn},
   {key:'stronghold',name:'Stronghold',col:'#a172d6',get:k=>opt.holds},
@@ -272,14 +272,14 @@ function regen(seedStr){
   dim=parseInt(document.getElementById('dim').value);
   F.setup(mc,Number((seedU>>32n)&0xffffffffn),Number(seedU&0xffffffffn),dim);
   if(!palette){ const p=F.colors(); palette=M.HEAPU8.slice(p,p+768); }
-  tiles.clear(); structs={}; structDirty=true;
+  tiles.clear(); structs={};
   if(dim===0){
     const sp=M._malloc(8); F.spawn(sp); spawn={x:M.HEAP32[sp>>2],z:M.HEAP32[(sp>>2)+1]}; M._free(sp);
     const hp=M._malloc(128*8); const n=F.holds(hp,128); holds=[];
     for(let i=0;i<n;i++) holds.push({x:M.HEAP32[(hp>>2)+i*2],z:M.HEAP32[(hp>>2)+i*2+1]}); M._free(hp);
     cam.x=spawn.x; cam.z=spawn.z;
   }else{ spawn=null; holds=[]; cam.x=0; cam.z=0; }
-  dirty=true;
+  scanStructures(); dirty=true;
 }
 
 //===================== rendering =====================
@@ -372,30 +372,27 @@ function isSlime(seed,cx,cz){
 
 //===================== structures scan =====================
 function scanStructures(){
-  if(!M) return; const ppb=cam.ppb, m=400/ppb;
+  if(!M) return; const ppb=cam.ppb, m=Math.min(1600,(VW/ppb)*0.2);
   const x0=Math.floor(cam.x-(VW/2)/ppb-m),x1=Math.ceil(cam.x+(VW/2)/ppb+m);
   const z0=Math.floor(cam.z-(VH/2)/ppb-m),z1=Math.ceil(cam.z+(VH/2)/ppb+m);
   const area=(x1-x0)*(z1-z0); const p=M._malloc(4096*8);
   STRUCTS.forEach(s=>{ if(s.dim!==dim||!opt.struct[s.key]){ structs[s.key]=[]; return; }
-    if(area>3.2e9){ structs[s.key]=[]; return; }
+    if(area>1.4e9){ structs[s.key]=[]; return; }
     const n=F.find(s.id,x0,z0,x1,z1,p,4096),a=[];
     for(let i=0;i<n;i++) a.push({x:M.HEAP32[(p>>2)+i*2],z:M.HEAP32[(p>>2)+i*2+1]}); structs[s.key]=a; });
   M._free(p);
 }
 
 //===================== loop =====================
-let lastScan='';
-function loop(){
-  if(dirty){ const sk=Math.round(cam.x)+'/'+Math.round(cam.z)+'/'+cam.ppb.toFixed(4)+'/'+dim;
-    if(structDirty||sk!==lastScan){ scanStructures(); lastScan=sk; structDirty=false; } render(); dirty=false; }
-  requestAnimationFrame(loop);
-}
+function loop(){ if(dirty){ render(); dirty=false; } requestAnimationFrame(loop); }
+let scanT=0;
+function queueScan(d){ clearTimeout(scanT); scanT=setTimeout(()=>{ scanStructures(); dirty=true; }, d==null?130:d); }
 
 //===================== interaction =====================
 function resize(){
   VW=innerWidth||document.documentElement.clientWidth||1280;
   VH=innerHeight||document.documentElement.clientHeight||720;
-  const dpr=devicePixelRatio||1;
+  const dpr=Math.min(1.5,devicePixelRatio||1);
   cv.width=Math.round(VW*dpr); cv.height=Math.round(VH*dpr);
   cv.style.width=VW+'px'; cv.style.height=VH+'px';
   ctx.setTransform(dpr,0,0,dpr,0,0); dirty=true;
@@ -410,12 +407,12 @@ cv.addEventListener('pointermove',e=>{
   document.getElementById('mx').textContent=Math.floor(mb.x); document.getElementById('mz').textContent=Math.floor(mb.z);
   updateBiome(mb.x,mb.z);
   if(drag){ const dx=e.clientX-drag.x,dy=e.clientY-drag.y; drag.moved+=Math.abs(dx)+Math.abs(dy);
-    cam.x=drag.cx-dx/cam.ppb; cam.z=drag.cz-dy/cam.ppb; dirty=true; }
+    cam.x=drag.cx-dx/cam.ppb; cam.z=drag.cz-dy/cam.ppb; dirty=true; queueScan(); }
 });
 addEventListener('pointerup',e=>{ if(drag){ if(drag.moved<5) clickAt(e.clientX,e.clientY); drag=null; cv.classList.remove('drag'); }});
 cv.addEventListener('wheel',e=>{ e.preventDefault();
   const a=screenToBlock(e.clientX,e.clientY); cam.ppb=Math.max(0.004,Math.min(24,cam.ppb*(e.deltaY<0?1.18:1/1.18)));
-  const b=screenToBlock(e.clientX,e.clientY); cam.x+=a.x-b.x; cam.z+=a.z-b.z; dirty=true;
+  const b=screenToBlock(e.clientX,e.clientY); cam.x+=a.x-b.x; cam.z+=a.z-b.z; dirty=true; queueScan();
   const h=document.getElementById('hint'); h.style.opacity=0;
 },{passive:false});
 function screenToBlock(px,py){ const r=cv.getBoundingClientRect(); return {x:cam.x+(px-r.left-VW/2)/cam.ppb, z:cam.z+(py-r.top-VH/2)/cam.ppb}; }
@@ -453,8 +450,8 @@ function buildSide(){
   h+='<div class=grp><h4>Structures</h4>'+STRUCTS.map(s=>row(s.key,s.name,s.col,opt.struct[s.key],'s')).join('')+'</div>';
   el.innerHTML=h;
   el.querySelectorAll('[data-o]').forEach(r=>r.onclick=()=>{ const k=r.dataset.o,m={biomes:'biomes',grid:'grid',spawn:'spawn',stronghold:'holds',slime:'slime'}[k];
-    opt[m]=!opt[m]; r.classList.toggle('on',opt[m]); dirty=true; if(k==='slime')structDirty=true; });
-  el.querySelectorAll('[data-s]').forEach(r=>r.onclick=()=>{ const k=r.dataset.s; opt.struct[k]=!opt.struct[k]; r.classList.toggle('on',opt.struct[k]); structDirty=true; dirty=true; });
+    opt[m]=!opt[m]; r.classList.toggle('on',opt[m]); dirty=true; });
+  el.querySelectorAll('[data-s]').forEach(r=>r.onclick=()=>{ const k=r.dataset.s; opt.struct[k]=!opt.struct[k]; r.classList.toggle('on',opt.struct[k]); scanStructures(); dirty=true; });
 }
 
 //===================== controls =====================
@@ -464,8 +461,8 @@ $('seed').addEventListener('keydown',e=>{if(e.key==='Enter')regen(e.target.value
 $('ver').onchange=()=>regen($('seed').value);
 $('dim').onchange=()=>regen($('seed').value);
 $('rand').onclick=()=>{ $('seed').value=''; regen(''); $('seed').value=BigInt.asIntN(64,seedU).toString(); };
-$('zin').onclick=()=>{cam.ppb=Math.min(24,cam.ppb*1.5);dirty=true;};
-$('zout').onclick=()=>{cam.ppb=Math.max(0.004,cam.ppb/1.5);dirty=true;};
+$('zin').onclick=()=>{cam.ppb=Math.min(24,cam.ppb*1.5);dirty=true;queueScan();};
+$('zout').onclick=()=>{cam.ppb=Math.max(0.004,cam.ppb/1.5);dirty=true;queueScan();};
 const q=new URLSearchParams(location.search); if(q.get('seed')!==null) $('seed').value=q.get('seed');
 </script>
 </body>
