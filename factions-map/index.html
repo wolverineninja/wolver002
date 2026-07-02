@@ -137,11 +137,23 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 /* ── waypoints (personal, this browser only) ── */
 .wpmark{position:relative}
 .wpmark .dia{position:absolute;left:-7px;top:-7px;width:12px;height:12px;background:#4fd6e0;
-  border:2px solid #08343a;transform:rotate(45deg);box-shadow:0 0 0 2px rgba(0,0,0,.55)}
+  border:2px solid rgba(0,0,0,.7);transform:rotate(45deg);box-shadow:0 0 0 2px rgba(0,0,0,.55)}
 .wpmark .wlabel{position:absolute;left:11px;top:-8px;white-space:nowrap;font-size:11px;color:#c3f4f8;
   text-shadow:1px 1px #04222a;background:rgba(0,0,0,.5);padding:0 5px 2px;pointer-events:none}
-#wpHint{position:fixed;right:12px;bottom:12px;z-index:16;font-family:MC,monospace;font-size:11px;
-  color:#7c8a8c;text-shadow:1px 1px #000;background:rgba(0,0,0,.4);padding:3px 8px 5px;pointer-events:none}
+/* waypoint click menu */
+#wpMenu{position:fixed;z-index:35;display:none;width:170px;background:rgba(0,0,0,.86);border:2px solid #000;
+  box-shadow:0 0 0 2px #2a6b72;padding:8px}
+#wpMenu.open{display:block}
+#wpMenu .wpm-head{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+#wpMenu .wpm-head span:first-child{flex:1;font-size:13px;color:#c3f4f8;text-shadow:1px 1px #04222a;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#wpMenu .stop{cursor:pointer;color:#aaa;padding:0 3px}
+#wpMenu .stop:hover{color:#fff}
+#wpmSwatches{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:8px}
+.wsw{height:22px;cursor:pointer;box-shadow:0 0 0 2px rgba(0,0,0,.6);border:2px solid transparent}
+.wsw.on{border-color:#fff}
+.wsw:hover{border-color:#c3f4f8}
+#wpMenu .mcbtn{width:100%;font-size:13px}
 #wpBanner{position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:40;display:none;
   font-family:MC,monospace;font-size:14px;color:#c3f4f8;text-shadow:2px 2px #04222a;
   background:rgba(0,0,0,.82);border:2px solid #000;box-shadow:0 0 0 2px #2a6b72;padding:7px 14px 9px}
@@ -243,8 +255,12 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
   <div id=dbList><div class=pempty>Open to load...</div></div>
 </div>
 
-<div id=wpHint>right-click map: add waypoint</div>
 <div id=wpBanner>Click anywhere on the map to add a waypoint &middot; <span class=cx onclick=cancelWpPlace()>cancel</span></div>
+<div id=wpMenu>
+  <div class=wpm-head><span id=wpmName></span><span class=stop onclick=closeWpMenu()>x</span></div>
+  <div id=wpmSwatches></div>
+  <button class=mcbtn onclick=deleteWp()>Delete</button>
+</div>
 <div id=atPopup>
   <div class=at-head><span id=atTitle></span><span class=stop onclick=closeAt()>x</span></div>
   <div id=atList></div>
@@ -525,14 +541,17 @@ function renderList(players) {
 }
 
 // ═══ Waypoints (saved only in this browser — nobody else sees them) ═══
+const WP_COLORS = ['#4fd6e0', '#ff5555', '#55ff55', '#ffff55', '#ff7edb', '#ffa63b', '#ffffff', '#a56cff'];
 let waypoints = [];
 try { waypoints = JSON.parse(localStorage.getItem('waypoints') || '[]'); } catch (e) { waypoints = []; }
 const wpMarkers = new Map();
+let wpMenuId = null;
 
 function saveWaypoints() { localStorage.setItem('waypoints', JSON.stringify(waypoints)); }
 function wpIcon(w) {
+  const c = w.color || WP_COLORS[0];
   return L.divIcon({ className: '', iconSize: [0, 0],
-    html: `<div class=wpmark><div class=dia></div><div class=wlabel>${escapeHtml(w.name)}</div></div>` });
+    html: `<div class=wpmark><div class=dia style="background:${c}"></div><div class=wlabel style="color:${c}">${escapeHtml(w.name)}</div></div>` });
 }
 function renderWaypoints() {
   const ids = new Set(waypoints.map(w => w.id));
@@ -541,7 +560,7 @@ function renderWaypoints() {
     let m = wpMarkers.get(w.id);
     if (!m) {
       m = L.marker(toLatLng(w.x, w.z), { icon: wpIcon(w), zIndexOffset: 2000 }).addTo(map);
-      m.on('click', () => removeWaypoint(w.id));
+      m.on('click', () => openWpMenu(w.id));
       wpMarkers.set(w.id, m);
     } else { m.setLatLng(toLatLng(w.x, w.z)); m.setIcon(wpIcon(w)); }
   }
@@ -552,17 +571,35 @@ function addWaypoint(x, z) {
   if (name === null) return;
   waypoints.push({ id: 'wp' + Date.now() + '_' + Math.floor(Math.random() * 1000),
                    name: name.trim() || ('Waypoint ' + (waypoints.length + 1)),
-                   x: Math.round(x), z: Math.round(z) });
+                   x: Math.round(x), z: Math.round(z), color: WP_COLORS[0] });
   saveWaypoints(); renderWaypoints();
 }
-function removeWaypoint(id) {
-  const w = waypoints.find(x => x.id === id); if (!w) return;
-  if (confirm(`Delete waypoint "${w.name}"?`)) { waypoints = waypoints.filter(x => x.id !== id); saveWaypoints(); renderWaypoints(); }
+
+// click a waypoint -> little menu to recolor or delete it
+function openWpMenu(id) {
+  const m = wpMarkers.get(id); if (!m) return;
+  wpMenuId = id;
+  renderWpMenu();
+  const el = document.getElementById('wpMenu');
+  el.classList.add('open');
+  const pt = map.latLngToContainerPoint(m.getLatLng());
+  el.style.left = Math.max(8, Math.min(pt.x + 14, window.innerWidth - 182)) + 'px';
+  el.style.top = Math.max(58, Math.min(pt.y - 8, window.innerHeight - 150)) + 'px';
 }
-map.on('contextmenu', e => {
-  if (e.originalEvent) e.originalEvent.preventDefault();
-  addWaypoint(e.latlng.lng / UPB, -e.latlng.lat / UPB);
-});
+function renderWpMenu() {
+  const w = waypoints.find(x => x.id === wpMenuId); if (!w) { closeWpMenu(); return; }
+  document.getElementById('wpmName').textContent = w.name;
+  document.getElementById('wpmSwatches').innerHTML = WP_COLORS.map(c =>
+    `<span class="wsw${c === (w.color || WP_COLORS[0]) ? ' on' : ''}" style="background:${c}" onclick="setWpColor('${c}')"></span>`).join('');
+}
+function setWpColor(c) {
+  const w = waypoints.find(x => x.id === wpMenuId); if (!w) return;
+  w.color = c; saveWaypoints(); renderWaypoints(); renderWpMenu();
+}
+function deleteWp() {
+  waypoints = waypoints.filter(x => x.id !== wpMenuId); saveWaypoints(); renderWaypoints(); closeWpMenu();
+}
+function closeWpMenu() { wpMenuId = null; document.getElementById('wpMenu').classList.remove('open'); }
 renderWaypoints();
 
 // "Add Waypoint" from Extensions: arm place-mode, then the next map click drops one
@@ -606,6 +643,7 @@ const fmtAgo = s => s < 60 ? s + 's ago' : s < 3600 ? Math.round(s / 60) + 'm ag
 function closeAt() { document.getElementById('atPopup').classList.remove('open'); }
 
 map.on('click', async e => {
+  closeWpMenu();                           // clicking the map dismisses the waypoint menu
   if (wpPlaceMode) {                       // placing a waypoint takes priority
     cancelWpPlace();
     addWaypoint(e.latlng.lng / UPB, -e.latlng.lat / UPB);
