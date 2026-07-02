@@ -199,6 +199,7 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 <div id=extPanel>
   <h4>Extensions</h4>
   <button class=mcbtn data-ext=y onclick="toggleExt('y')">Y Axis: OFF</button>
+  <button class=mcbtn data-ext=heat onclick="toggleExt('heat')">Heatmap: OFF</button>
 </div>
 
 <div id=dbPanel>
@@ -220,6 +221,7 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <script>
 // ═══ Config ═══
 const FVR = 'https://factionsvr.com';                                   // tiles + skins (plain <img>, no CORS needed)
@@ -312,7 +314,8 @@ document.querySelectorAll('.mcfield input').forEach(i =>
 
 // ═══ Extensions ═══
 const ext = {
-  y: localStorage.getItem('ext.y') === '1', // Y axis off by default
+  y: localStorage.getItem('ext.y') === '1',       // Y axis off by default
+  heat: localStorage.getItem('ext.heat') === '1', // Heatmap off by default
 };
 function syncExtButtons() {
   document.querySelectorAll('#extPanel [data-ext]').forEach(b => {
@@ -324,6 +327,7 @@ function toggleExt(k) {
   ext[k] = !ext[k];
   localStorage.setItem('ext.' + k, ext[k] ? '1' : '0');
   syncExtButtons();
+  if (k === 'heat') ext.heat ? startHeatmap() : stopHeatmap();
 }
 function toggleExtPanel() {
   const p = document.getElementById('extPanel');
@@ -467,6 +471,26 @@ function renderList(players) {
   }
   syncSel();
 }
+
+// ═══ Heatmap ═══
+const HEAT_API = 'https://admin.wolver002.com/factions/api/heatmap';
+let heatLayer = null, heatTimer = null;
+async function refreshHeat() {
+  let d;
+  try { d = await (await fetch(HEAT_API, { cache: 'no-store' })).json(); }
+  catch (e) { return; }
+  const max = d.max || 1;
+  const pts = (d.cells || []).map(([x, z, w]) => { const ll = toLatLng(x, z); return [ll[0], ll[1], w / max]; });
+  if (!heatLayer) {
+    heatLayer = L.heatLayer(pts, {
+      radius: 22, blur: 24, minOpacity: 0.3, maxZoom: BASE_ZOOM - 1,
+      gradient: { 0.2: '#2b45ff', 0.4: '#00cfcf', 0.6: '#37d837', 0.8: '#ffd23b', 1.0: '#ff3b2f' }
+    }).addTo(map);
+  } else heatLayer.setLatLngs(pts);
+}
+function startHeatmap() { refreshHeat(); clearInterval(heatTimer); heatTimer = setInterval(refreshHeat, 60000); }
+function stopHeatmap() { clearInterval(heatTimer); heatTimer = null; if (heatLayer) { map.removeLayer(heatLayer); heatLayer = null; } }
+if (ext.heat) startHeatmap();
 
 // ═══ 2atabase (base finder) ═══
 const BASES_API = 'https://admin.wolver002.com/factions/api/bases';
