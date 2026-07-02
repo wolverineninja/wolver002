@@ -53,6 +53,14 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
   background:rgba(0,0,0,.62);border:2px solid #000;padding:8px;display:flex;flex-direction:column}
 #side.hidden{display:none}
 #side h4{font-size:16px;font-weight:normal;text-align:center;padding:2px 0 8px;color:#fff;text-shadow:2px 2px #3e3e3e}
+#sideHead{position:relative;flex:none}
+#plSearchBtn{position:absolute;right:0;top:-2px;padding:3px 5px 4px;font-size:0;line-height:0}
+#plSearchBtn svg{display:block;shape-rendering:crispEdges}
+#plSearch{display:none;font-family:MC,monospace;background:#000;border:2px solid #a0a0a0;color:#fff;font-size:14px;
+  padding:6px 8px;margin-bottom:7px;outline:0;flex:none}
+#side.searching #plSearch{display:block}
+#plSearch:focus{border-color:#fff}
+#plSearch::placeholder{color:#666}
 #playerList{overflow-y:auto;display:flex;flex-direction:column;gap:2px}
 #playerList::-webkit-scrollbar{width:10px}
 #playerList::-webkit-scrollbar-track{background:#000}
@@ -230,7 +238,11 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 </div>
 
 <div id=side>
-  <h4 id=playerCount>Players</h4>
+  <div id=sideHead>
+    <h4 id=playerCount>Players</h4>
+    <button id=plSearchBtn class=mcbtn onclick=togglePlSearch() title="Search players"><svg width=14 height=14 viewBox="0 0 10 10" fill=#fff xmlns="http://www.w3.org/2000/svg"><rect x=2 y=1 width=4 height=1/><rect x=1 y=2 width=1 height=4/><rect x=6 y=2 width=1 height=4/><rect x=2 y=6 width=4 height=1/><rect x=6 y=6 width=1 height=1/><rect x=7 y=7 width=1 height=1/><rect x=8 y=8 width=1 height=1/></svg></button>
+  </div>
+  <input id=plSearch placeholder="Search player..." oninput=plSearchInput() onkeydown="if(event.key==='Escape')togglePlSearch()" autocomplete=off spellcheck=false>
   <div id=playerList><div class=pempty>Loading...</div></div>
 </div>
 
@@ -503,13 +515,26 @@ function playSecs(s) {
 }
 
 let rosterKey = '';
+let plQuery = '';
+function togglePlSearch() {
+  const on = document.getElementById('side').classList.toggle('searching');
+  const inp = document.getElementById('plSearch');
+  if (on) inp.focus();
+  else { inp.value = ''; plQuery = ''; renderList(lastPlayers); }
+}
+function plSearchInput() {
+  plQuery = document.getElementById('plSearch').value.trim().toLowerCase();
+  renderList(lastPlayers);
+}
 function renderList(players) {
   const list = document.getElementById('playerList');
   document.getElementById('onlineCount').textContent = players.length;
   document.getElementById('playerCount').textContent = players.length ? `Players — ${players.length}` : 'Players';
   if (!players.length) { list.innerHTML = '<div class=pempty>No players online</div>'; rosterKey = ''; return; }
-  const sorted = [...players].sort((a, b) => playSecs(b.PlayTime) - playSecs(a.PlayTime)); // longest on top
-  const key = sorted.map(p => `${p.id}:${p.SkinId}`).join(',');
+  const sorted = [...players].sort((a, b) => playSecs(b.PlayTime) - playSecs(a.PlayTime)) // longest on top
+    .filter(p => !plQuery || (p.Username || '').toLowerCase().includes(plQuery));
+  if (!sorted.length) { list.innerHTML = '<div class=pempty>No players match</div>'; rosterKey = ''; return; }
+  const key = plQuery + '|' + sorted.map(p => `${p.id}:${p.SkinId}`).join(',');
   if (key !== rosterKey) {
     rosterKey = key;
     list.innerHTML = sorted.map(p => `
