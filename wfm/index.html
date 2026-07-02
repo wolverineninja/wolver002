@@ -120,23 +120,30 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 .basemark.low .flag{background:#6d6d6d;border-color:#9a9a9a #383838 #383838 #9a9a9a}
 .basemark .blabel{position:absolute;left:16px;top:-16px;white-space:nowrap;font-size:10px;color:#ffd98a;
   text-shadow:1px 1px #000;background:rgba(0,0,0,.45);padding:0 4px 2px;pointer-events:none}
-/* 2atabase panel */
-#dbPanel{position:fixed;top:66px;left:12px;bottom:12px;z-index:25;display:none;flex-direction:column;width:274px;
+/* 2atabase + Sessions panels */
+#dbPanel,#sessPanel{position:fixed;top:66px;left:12px;bottom:12px;z-index:25;display:none;flex-direction:column;width:274px;
   background:rgba(0,0,0,.66);border:2px solid #000;padding:8px}
-#dbPanel.open{display:flex}
-#dbPanel h4{font-size:14px;font-weight:normal;text-align:center;padding-bottom:6px;text-shadow:2px 2px #3e3e3e}
+#dbPanel.open,#sessPanel.open{display:flex}
+#dbPanel h4,#sessPanel h4{font-size:14px;font-weight:normal;text-align:center;padding-bottom:6px;text-shadow:2px 2px #3e3e3e}
 .dbnote{font-size:11px;color:#ffd98a;text-shadow:1px 1px #000;background:rgba(120,90,20,.22);
   border:1px solid #6a5015;padding:5px 7px;margin-bottom:7px;line-height:1.35}
-#dbSearch{font-family:MC,monospace;background:#000;border:2px solid #a0a0a0;color:#fff;font-size:14px;
+#dbSearch,#sessSearch{font-family:MC,monospace;background:#000;border:2px solid #a0a0a0;color:#fff;font-size:14px;
   padding:6px 8px;margin-bottom:7px;outline:0}
-#dbSearch:focus{border-color:#fff}
-#dbSearch::placeholder{color:#666}
-#dbList{overflow-y:auto;display:flex;flex-direction:column;gap:2px}
-#dbList::-webkit-scrollbar{width:10px}
-#dbList::-webkit-scrollbar-track{background:#000}
-#dbList::-webkit-scrollbar-thumb{background:#6d6d6d;border:2px solid #000}
+#dbSearch:focus,#sessSearch:focus{border-color:#fff}
+#dbSearch::placeholder,#sessSearch::placeholder{color:#666}
+#dbList,#sessList{overflow-y:auto;display:flex;flex-direction:column;gap:2px}
+#dbList::-webkit-scrollbar,#sessList::-webkit-scrollbar{width:10px}
+#dbList::-webkit-scrollbar-track,#sessList::-webkit-scrollbar-track{background:#000}
+#dbList::-webkit-scrollbar-thumb,#sessList::-webkit-scrollbar-thumb{background:#6d6d6d;border:2px solid #000}
 .dbit{display:flex;align-items:center;gap:8px;padding:5px 7px;cursor:pointer;background:rgba(255,255,255,.08);border:2px solid transparent}
 .dbit:hover{background:rgba(255,255,255,.2)}
+.dbit.on{border-color:#fff;background:rgba(255,255,255,.16)}
+/* session trail end-dot + nametag */
+.strail{position:relative}
+.strail .sdot{position:absolute;left:-6px;top:-6px;width:8px;height:8px;border:2px solid rgba(0,0,0,.7);
+  box-shadow:0 0 0 2px rgba(0,0,0,.45)}
+.strail .slabel{position:absolute;left:9px;top:-9px;white-space:nowrap;font-size:11px;
+  text-shadow:1px 1px #000;background:rgba(0,0,0,.5);padding:0 5px 2px;pointer-events:none}
 .dbit .nm{flex:1;min-width:0}
 .dbit .u{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:2px 2px #3e3e3e}
 .dbit .s{font-size:11px;color:#aaa;text-shadow:1px 1px #2a2a2a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -229,6 +236,7 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
   <div class=mcfield><span class=lab>Z</span><input id=gotoZ type=number placeholder=0></div>
   <button class=mcbtn id=extbtn onclick=toggleExtPanel()>Extensions</button>
   <button class=mcbtn id=dbbtn onclick=toggleDbPanel()>2atabase</button>
+  <button class=mcbtn id=sessbtn onclick=toggleSessPanel()>Sessions</button>
   <button class=mcbtn onclick=refreshTiles()>Reload</button>
   <button class=mcbtn onclick=toggleSidebar()>List</button>
   <div class=online>
@@ -265,6 +273,13 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
   <div class=dbnote>Still collecting &amp; analyzing data &mdash; it will likely take 1 week+ of tracking to get accurate base coordinates.</div>
   <input id=dbSearch placeholder="Search player..." oninput=renderDbList() autocomplete=off spellcheck=false>
   <div id=dbList><div class=pempty>Open to load...</div></div>
+</div>
+
+<div id=sessPanel>
+  <h4>Sessions</h4>
+  <div class=dbnote>Everywhere a player went, one trail per join. Their last 3 sessions are kept &mdash; each rejoin rolls the oldest off. <span style=color:#ffff55>Yellow</span> = latest, <span style=color:#ff9a3b>orange</span> = before, <span style=color:#9a9a9a>gray</span> = oldest. Click a player again to hide.</div>
+  <input id=sessSearch placeholder="Search player..." oninput=renderSessList() autocomplete=off spellcheck=false>
+  <div id=sessList><div class=pempty>Open to load...</div></div>
 </div>
 
 <div id=wpBanner>Click anywhere on the map to add a waypoint &middot; <span class=cx onclick=cancelWpPlace()>cancel</span></div>
@@ -723,6 +738,7 @@ function toggleDbPanel() {
   dbOpen = !dbOpen;
   document.getElementById('dbPanel').classList.toggle('open', dbOpen);
   if (dbOpen) {
+    if (sessOpen) toggleSessPanel();     // the two panels share the left edge
     refreshBases();
     clearInterval(dbTimer);
     dbTimer = setInterval(refreshBases, 15000);
@@ -763,6 +779,82 @@ function selectBase(id) {
   if (!selBaseMarker) selBaseMarker = L.marker(ll, { icon: baseIcon(b), zIndexOffset: 1000 }).addTo(map);
   else { selBaseMarker.setLatLng(ll); selBaseMarker.setIcon(baseIcon(b)); }
   map.setView(ll, Math.max(map.getZoom(), BASE_ZOOM - 1));
+}
+
+// ═══ Sessions (per-join trails: kept until the player rejoins 3 times) ═══
+const SESS_API = 'https://admin.wolver002.com/factions/api/sessions';
+const SESS_COLORS = ['#9a9a9a', '#ff9a3b', '#ffff55'];   // oldest -> newest
+let sessOpen = false, sessTimer = null, sessTrailTimer = null;
+let sessPlayers = [], sessSel = null, sessLayers = [];
+
+function toggleSessPanel() {
+  sessOpen = !sessOpen;
+  document.getElementById('sessPanel').classList.toggle('open', sessOpen);
+  if (sessOpen) {
+    if (dbOpen) toggleDbPanel();
+    refreshSessList();
+    clearInterval(sessTimer);
+    sessTimer = setInterval(refreshSessList, 60000);
+  } else {
+    clearInterval(sessTimer); sessTimer = null;
+  }
+}
+async function refreshSessList() {
+  try { const d = await (await fetch(SESS_API, { cache: 'no-store' })).json(); sessPlayers = d.players || []; }
+  catch (e) { return; }
+  renderSessList();
+}
+function renderSessList() {
+  const list = document.getElementById('sessList');
+  const q = (document.getElementById('sessSearch').value || '').trim().toLowerCase();
+  if (!sessPlayers.length) { list.innerHTML = '<div class=pempty>No players tracked yet</div>'; return; }
+  const rows = sessPlayers.filter(p => (p.username || '').toLowerCase().includes(q));
+  if (!rows.length) { list.innerHTML = '<div class=pempty>No players match</div>'; return; }
+  const now = Math.floor(Date.now() / 1000);
+  list.innerHTML = rows.map(p => `
+    <div class="dbit${sessSel === p.username ? ' on' : ''}" data-name="${escapeHtml(p.username)}">
+      <span class=nm>
+        <div class=u style="${adminStyle(p.username, 2)}">${escapeHtml(p.username)}</div>
+        <div class=s>seen ${fmtAgo(Math.max(0, now - p.lastSeen))}</div>
+      </span>
+    </div>`).join('');
+  list.querySelectorAll('.dbit').forEach(el => el.addEventListener('click', () => selectSession(el.dataset.name)));
+}
+function clearSessTrails() {
+  sessLayers.forEach(l => map.removeLayer(l)); sessLayers = [];
+  clearInterval(sessTrailTimer); sessTrailTimer = null;
+  sessSel = null;
+}
+function selectSession(name) {
+  if (sessSel === name) { clearSessTrails(); renderSessList(); return; }   // toggle off
+  clearSessTrails();
+  sessSel = name;
+  renderSessList();
+  drawSessTrails(name, true);
+  sessTrailTimer = setInterval(() => drawSessTrails(name, false), 30000);  // a live session keeps growing
+}
+async function drawSessTrails(name, fit) {
+  let d;
+  try { d = await (await fetch(`${SESS_API}?name=${encodeURIComponent(name)}`, { cache: 'no-store' })).json(); }
+  catch (e) { return; }
+  if (sessSel !== name) return;                       // deselected while fetching
+  sessLayers.forEach(l => map.removeLayer(l)); sessLayers = [];
+  const ss = d.sessions || [];
+  if (!ss.length) return;
+  const now = Math.floor(Date.now() / 1000);
+  let newestLls = null;
+  ss.forEach((s, i) => {
+    const lls = s.points.map(([x, y, z]) => toLatLng(x, z));
+    const col = SESS_COLORS[SESS_COLORS.length - ss.length + i] || SESS_COLORS[0];
+    sessLayers.push(L.polyline(lls, { color: '#000', weight: 5, opacity: .55, interactive: false }).addTo(map));
+    sessLayers.push(L.polyline(lls, { color: col, weight: 2, opacity: .95, interactive: false }).addTo(map));
+    const endIcon = L.divIcon({ className: '', iconSize: [0, 0], html:
+      `<div class=strail><div class=sdot style="background:${col}"></div><div class=slabel style="color:${col}">` +
+      `${escapeHtml(name)} &middot; ${s.live ? 'online now' : fmtAgo(Math.max(0, now - s.end))}</div></div>` });
+    sessLayers.push(L.marker(lls[lls.length - 1], { icon: endIcon, zIndexOffset: 1500, interactive: false }).addTo(map));
+    newestLls = lls;
+  });
+  if (fit && newestLls.length) map.fitBounds(L.latLngBounds(newestLls), { maxZoom: BASE_ZOOM - 1, animate: false });
 }
 
 async function poll() {
