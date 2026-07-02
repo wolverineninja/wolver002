@@ -76,15 +76,6 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
   font-size:16px;color:#ffff55;text-shadow:2px 2px #3e3e15;background:rgba(0,0,0,.35);padding:4px 12px 6px;cursor:pointer}
 #followNote.on{display:block}
 
-/* ── zoom (MC buttons, bottom right) ── */
-.leaflet-control-zoom{border:none!important;box-shadow:none!important;display:flex;flex-direction:column;gap:6px}
-.leaflet-control-zoom a{width:40px!important;height:40px!important;line-height:36px!important;border-radius:0!important;
-  font-family:MC,monospace!important;font-size:20px!important;color:#fff!important;text-shadow:2px 2px #3e3e3e;
-  background:#6d6d6d!important;border:2px solid!important;border-color:#a6a6a6 #383838 #383838 #a6a6a6!important;
-  outline:2px solid #000}
-.leaflet-control-zoom a:hover{background:#7c81b8!important;border-color:#b6bae6 #43436e #43436e #b6bae6!important}
-.leaflet-bottom.leaflet-right .leaflet-control{margin:0 12px 12px 0}
-
 /* ── player heads / markers ── */
 .face,.hat{position:absolute;inset:0;background-repeat:no-repeat;image-rendering:pixelated}
 .gi .face{background-size:192px auto;background-position:-24px -24px}
@@ -109,7 +100,7 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 #load .msg{font-size:20px;color:#ddd;text-shadow:2px 2px #373737}
 
 @media(max-width:820px){
-  .mcfield,#gobtn,#originbtn{display:none}
+  .mcfield,#gobtn{display:none}
   #bar .sub{display:none}
   #side{width:212px}
 }
@@ -129,7 +120,6 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
   <div class=mcfield><span class=lab>X</span><input id=gotoX type=number placeholder=0></div>
   <div class=mcfield><span class=lab>Z</span><input id=gotoZ type=number placeholder=0></div>
   <button class=mcbtn id=gobtn onclick=goToCoords()>Go</button>
-  <button class=mcbtn id=originbtn onclick=goToOrigin()>0, 0</button>
   <button class=mcbtn onclick=refreshTiles()>Reload</button>
   <button class=mcbtn onclick=toggleSidebar()>List</button>
   <div class=online>
@@ -155,7 +145,7 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 // ═══ Config ═══
 const FVR = 'https://factionsvr.com';                                   // tiles + skins (plain <img>, no CORS needed)
 const PLAYERS_API = 'https://admin.wolver002.com/factions/api/players'; // our CORS proxy on the wolver server
-const POLL_MS = 2500;
+const POLL_MS = 1000; // matches the official map's refresh rate
 
 // Tile scheme (mirrors the official map exactly so tiles line up)
 const CHUNK_SIZE = 16, TILE_SIZE = 256, BASE_ZOOM = 8, MIN_ZOOM = 0, MAX_ZOOM = 11;
@@ -188,7 +178,6 @@ const map = L.map('map', {
   crs: L.CRS.Simple, center: toLatLng(175.5, 414.5), zoom: BASE_ZOOM - 4,
   minZoom: MIN_ZOOM, maxZoom: MAX_ZOOM, zoomControl: false, attributionControl: false
 });
-L.control.zoom({ position: 'bottomright' }).addTo(map);
 // recover if the container was 0-sized at init (hidden tab/embed) or gets resized
 new ResizeObserver(() => map.invalidateSize()).observe(document.getElementById('map'));
 
@@ -238,7 +227,6 @@ function goToCoords() {
   const z = parseInt(document.getElementById('gotoZ').value) || 0;
   map.setView(toLatLng(x, z), Math.max(map.getZoom(), BASE_ZOOM - 2));
 }
-function goToOrigin() { map.setView(toLatLng(0, 0), BASE_ZOOM - 2); }
 function refreshTiles() { cacheBuster = Date.now(); tileLayer.redraw(); }
 document.querySelectorAll('.mcfield input').forEach(i =>
   i.addEventListener('keydown', e => { if (e.key === 'Enter') goToCoords(); }));
@@ -365,6 +353,7 @@ function renderList(players) {
 }
 
 async function poll() {
+  const t0 = Date.now();
   try {
     const r = await fetch(PLAYERS_API, { cache: 'no-store' });
     const d = await r.json();
@@ -379,7 +368,8 @@ async function poll() {
     cb.querySelectorAll('i').forEach((b, i) => b.classList.toggle('on', i === 0));
     document.getElementById('onlineCount').textContent = '--';
   } finally {
-    setTimeout(poll, POLL_MS);
+    // fixed 1s cadence like the official map: don't let request time stretch the interval
+    setTimeout(poll, Math.max(150, POLL_MS - (Date.now() - t0)));
   }
 }
 poll();
