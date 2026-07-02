@@ -101,6 +101,28 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 #extPanel.open{display:flex}
 #extPanel h4{font-size:14px;font-weight:normal;text-align:center;padding-bottom:2px;text-shadow:2px 2px #3e3e3e}
 #extPanel .mcbtn{width:100%;font-size:14px}
+#extPanel .exthint{font-size:11px;color:#888;text-shadow:1px 1px #1a1a1a;line-height:1.35;padding:2px 2px 0}
+
+/* ── base finder ── */
+.basemark{position:relative}
+.basemark .flag{position:absolute;left:-1px;top:-16px;width:15px;height:11px;background:#c98a2e;
+  border:2px solid;border-color:#e6b45c #7a5015 #7a5015 #e6b45c;box-shadow:0 0 0 2px rgba(0,0,0,.5)}
+.basemark .pole{position:absolute;left:-1px;top:-16px;width:2px;height:20px;background:#3a2c18;box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+.basemark.med .flag{background:#b06a2a;border-color:#d0904a #6a3d12 #6a3d12 #d0904a}
+.basemark.low .flag{background:#6d6d6d;border-color:#9a9a9a #383838 #383838 #9a9a9a}
+.basemark .blabel{position:absolute;left:16px;top:-16px;white-space:nowrap;font-size:10px;color:#ffd98a;
+  text-shadow:1px 1px #000;background:rgba(0,0,0,.45);padding:0 4px 2px;pointer-events:none}
+#baseInfo{position:fixed;z-index:30;display:none;width:210px;background:rgba(0,0,0,.75);border:2px solid #000;
+  padding:8px 10px 10px;font-size:13px}
+#baseInfo.open{display:block}
+#baseInfo .bi-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+#baseInfo .bi-head span:first-child{flex:1;font-size:15px;color:#ffd98a;text-shadow:2px 2px #4a3410;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#baseInfo .stop{cursor:pointer;color:#aaa;padding:0 4px}
+#baseInfo .stop:hover{color:#fff}
+#baseInfo .row{display:flex;justify-content:space-between;gap:10px;padding:2px 0;color:#ccc;text-shadow:1px 1px #1a1a1a}
+#baseInfo .row b{color:#fff;font-weight:normal}
+#baseInfo .tpbtn{margin-top:7px;font-size:12px}
 
 /* ── dirt loading screen ── */
 #load{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -152,6 +174,13 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 <div id=extPanel>
   <h4>Extensions</h4>
   <button class=mcbtn data-ext=y onclick="toggleExt('y')">Y Axis: OFF</button>
+  <button class=mcbtn data-ext=bases onclick="toggleExt('bases')">Base Finder: OFF</button>
+  <div class=exthint>Base Finder logs positions every 30s and estimates each player's base from where they spend the most time, revisits across sessions, distance from spawn and height.</div>
+</div>
+
+<div id=baseInfo>
+  <div class=bi-head><span id=biName></span><span class=stop onclick=closeBaseInfo()>x</span></div>
+  <div id=biBody></div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -246,7 +275,10 @@ document.querySelectorAll('.mcfield input').forEach(i =>
   i.addEventListener('keydown', e => { if (e.key === 'Enter') goToCoords(); }));
 
 // ═══ Extensions ═══
-const ext = { y: localStorage.getItem('ext.y') === '1' }; // Y axis off by default
+const ext = {
+  y: localStorage.getItem('ext.y') === '1',         // Y axis off by default
+  bases: localStorage.getItem('ext.bases') === '1', // Base Finder off by default
+};
 function syncExtButtons() {
   document.querySelectorAll('#extPanel [data-ext]').forEach(b => {
     const k = b.dataset.ext, on = !!ext[k];
@@ -257,6 +289,7 @@ function toggleExt(k) {
   ext[k] = !ext[k];
   localStorage.setItem('ext.' + k, ext[k] ? '1' : '0');
   syncExtButtons();
+  if (k === 'bases') ext.bases ? startBaseFinder() : stopBaseFinder();
 }
 function toggleExtPanel() {
   const p = document.getElementById('extPanel');
@@ -384,6 +417,86 @@ function renderList(players) {
   }
   syncSel();
 }
+
+// ═══ Base Finder ═══
+const BASES_API = 'https://admin.wolver002.com/factions/api/bases';
+const baseMarkers = new Map(); // id -> {marker, data}
+let baseTimer = null, selectedBase = null;
+
+function baseIcon(b) {
+  const cls = b.confidence >= 60 ? '' : b.confidence >= 30 ? ' med' : ' low';
+  return L.divIcon({
+    className: '', iconSize: [0, 0],
+    html: `<div class="basemark${cls}"><div class=pole></div><div class=flag></div>
+      <div class=blabel>${escapeHtml(b.username)} ${b.confidence}%</div></div>`
+  });
+}
+
+async function refreshBases() {
+  let data;
+  try { data = await (await fetch(BASES_API, { cache: 'no-store' })).json(); }
+  catch (e) { return; }
+  const bases = data.bases || [];
+  const seen = new Set();
+  for (const b of bases) {
+    seen.add(b.id);
+    const ll = toLatLng(b.x, b.z);
+    let e = baseMarkers.get(b.id);
+    if (!e) {
+      const m = L.marker(ll, { icon: baseIcon(b), zIndexOffset: -1000 }).addTo(map);
+      m.on('click', () => showBaseInfo(b.id));
+      baseMarkers.set(b.id, e = { marker: m, data: b });
+    } else {
+      e.data = b;
+      e.marker.setLatLng(ll);
+      e.marker.setIcon(baseIcon(b));
+    }
+  }
+  for (const [id, e] of baseMarkers) {
+    if (!seen.has(id)) { map.removeLayer(e.marker); baseMarkers.delete(id); if (selectedBase === id) closeBaseInfo(); }
+  }
+  if (selectedBase && baseMarkers.has(selectedBase)) showBaseInfo(selectedBase); // refresh open panel
+}
+
+function startBaseFinder() {
+  refreshBases();
+  clearInterval(baseTimer);
+  baseTimer = setInterval(refreshBases, 15000);
+}
+function stopBaseFinder() {
+  clearInterval(baseTimer); baseTimer = null;
+  for (const [, e] of baseMarkers) map.removeLayer(e.marker);
+  baseMarkers.clear();
+  closeBaseInfo();
+}
+
+function showBaseInfo(id) {
+  const e = baseMarkers.get(id); if (!e) return;
+  const b = e.data;
+  selectedBase = id;
+  document.getElementById('biName').textContent = b.username;
+  const ago = Math.max(0, Math.round((Date.now() / 1000 - b.lastSeen) / 60));
+  const seen = ago < 1 ? 'just now' : ago < 60 ? ago + 'm ago' : Math.round(ago / 60) + 'h ago';
+  const time = b.minutes < 60 ? b.minutes + ' min' : (b.minutes / 60).toFixed(1) + ' hr';
+  document.getElementById('biBody').innerHTML = `
+    <div class=row><span>Base</span><b>${b.x}, ${b.y}, ${b.z}</b></div>
+    <div class=row><span>Confidence</span><b>${b.confidence}%</b></div>
+    <div class=row><span>Time here</span><b>${time}</b></div>
+    <div class=row><span>Visits</span><b>${b.sessions} over ${b.days} day${b.days === 1 ? '' : 's'}</b></div>
+    <div class=row><span>From spawn</span><b>${b.spawnDist} blocks</b></div>
+    <div class=row><span>Height</span><b>Y ${b.avgY}</b></div>
+    <div class=row><span>Last seen</span><b>${seen}</b></div>
+    <button class="mcbtn tpbtn" onclick="jumpToBase(${b.x},${b.z})">Go to base</button>`;
+  const panel = document.getElementById('baseInfo');
+  panel.classList.add('open');
+  const pt = map.latLngToContainerPoint(toLatLng(b.x, b.z));
+  panel.style.left = Math.max(8, Math.min(pt.x + 16, window.innerWidth - 226)) + 'px';
+  panel.style.top = Math.max(66, Math.min(pt.y, window.innerHeight - 220)) + 'px';
+}
+function closeBaseInfo() { selectedBase = null; document.getElementById('baseInfo').classList.remove('open'); }
+function jumpToBase(x, z) { map.setView(toLatLng(x, z), Math.max(map.getZoom(), BASE_ZOOM - 1)); }
+
+if (ext.bases) startBaseFinder();
 
 async function poll() {
   const t0 = Date.now();
