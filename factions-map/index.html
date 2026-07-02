@@ -95,6 +95,13 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 .pmarker .arrow::before{content:"";position:absolute;left:2px;top:1px;border:4px solid transparent;
   border-bottom:7px solid #fff;border-top:none}
 
+/* ── extensions panel (MC options-screen style) ── */
+#extPanel{position:fixed;top:66px;z-index:25;display:none;flex-direction:column;gap:8px;width:220px;
+  background:rgba(0,0,0,.62);border:2px solid #000;padding:8px}
+#extPanel.open{display:flex}
+#extPanel h4{font-size:14px;font-weight:normal;text-align:center;padding-bottom:2px;text-shadow:2px 2px #3e3e3e}
+#extPanel .mcbtn{width:100%;font-size:14px}
+
 /* ── dirt loading screen ── */
 #load{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:14px;background:#000;transition:opacity .4s;image-rendering:pixelated}
@@ -120,6 +127,7 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
   <div class=spacer></div>
   <div class=mcfield><span class=lab>X</span><input id=gotoX type=number placeholder=0></div>
   <div class=mcfield><span class=lab>Z</span><input id=gotoZ type=number placeholder=0></div>
+  <button class=mcbtn id=extbtn onclick=toggleExtPanel()>Extensions</button>
   <button class=mcbtn id=gobtn onclick=goToCoords()>Go</button>
   <button class=mcbtn onclick=refreshTiles()>Reload</button>
   <button class=mcbtn onclick=toggleSidebar()>List</button>
@@ -140,6 +148,11 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 </div>
 
 <div id=followNote onclick=stopFollow() title="Click to stop following">Following <span id=followName></span></div>
+
+<div id=extPanel>
+  <h4>Extensions</h4>
+  <button class=mcbtn data-ext=y onclick="toggleExt('y')">Y Axis: OFF</button>
+</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -231,6 +244,30 @@ function goToCoords() {
 function refreshTiles() { cacheBuster = Date.now(); tileLayer.redraw(); }
 document.querySelectorAll('.mcfield input').forEach(i =>
   i.addEventListener('keydown', e => { if (e.key === 'Enter') goToCoords(); }));
+
+// ═══ Extensions ═══
+const ext = { y: localStorage.getItem('ext.y') === '1' }; // Y axis off by default
+function syncExtButtons() {
+  document.querySelectorAll('#extPanel [data-ext]').forEach(b => {
+    const k = b.dataset.ext, on = !!ext[k];
+    b.textContent = b.textContent.replace(/: (ON|OFF)$/, `: ${on ? 'ON' : 'OFF'}`);
+  });
+}
+function toggleExt(k) {
+  ext[k] = !ext[k];
+  localStorage.setItem('ext.' + k, ext[k] ? '1' : '0');
+  syncExtButtons();
+}
+function toggleExtPanel() {
+  const p = document.getElementById('extPanel');
+  const open = !p.classList.contains('open');
+  p.classList.toggle('open', open);
+  if (open) {
+    const r = document.getElementById('extbtn').getBoundingClientRect();
+    p.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 236)) + 'px';
+  }
+}
+syncExtButtons();
 
 let sidebarOpen = true;
 function toggleSidebar() {
@@ -341,7 +378,9 @@ function renderList(players) {
     if (!p) continue;
     el.querySelector('.s').textContent = p.PlayTime || '';
     const pos = p.Pose?.Head?.Position;
-    el.querySelector('.pgslot').textContent = pos ? `${Math.floor(pos[0])}, ${Math.floor(pos[1])}, ${Math.floor(pos[2])}` : '';
+    el.querySelector('.pgslot').textContent = !pos ? '' :
+      ext.y ? `${Math.floor(pos[0])}, ${Math.floor(pos[1])}, ${Math.floor(pos[2])}`
+            : `${Math.floor(pos[0])}, ${Math.floor(pos[2])}`;
   }
   syncSel();
 }
