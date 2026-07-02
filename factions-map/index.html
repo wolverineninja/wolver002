@@ -561,7 +561,7 @@ async function refreshHeat() {
     }).addTo(map);
   } else heatLayer.setLatLngs(pts);
 }
-function startHeatmap() { refreshHeat(); clearInterval(heatTimer); heatTimer = setInterval(refreshHeat, 20000); }
+function startHeatmap() { refreshHeat(); clearInterval(heatTimer); heatTimer = setInterval(refreshHeat, 12000); }
 function stopHeatmap() { clearInterval(heatTimer); heatTimer = null; if (heatLayer) { map.removeLayer(heatLayer); heatLayer = null; } closeAt(); }
 if (ext.heat) startHeatmap();
 
