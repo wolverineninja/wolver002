@@ -102,8 +102,6 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
   filter:drop-shadow(1px 1px 0 #000)}
 .pmarker .arrow::before{content:"";position:absolute;left:2px;top:1px;border:4px solid transparent;
   border-bottom:7px solid #fff;border-top:none}
-#map .leaflet-marker-icon{transition:transform 2.4s linear}
-#map.nozoomanim .leaflet-marker-icon{transition:none}
 
 /* ── dirt loading screen ── */
 #load{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -313,7 +311,7 @@ function updateMarkers(players) {
       e = { marker: m, skin: p.SkinId };
       markers.set(p.id, e);
     } else {
-      // update in place — recreating the icon every poll causes flicker and kills the glide transition
+      // update in place — recreating the icon every poll causes flicker
       e.marker.setLatLng(ll);
       const root = e.marker.getElement()?.querySelector('.pmarker');
       if (root) {
@@ -365,10 +363,6 @@ function renderList(players) {
   }
   syncSel();
 }
-
-// suspend the marker glide transition while zooming so Leaflet can reposition icons instantly
-map.on('zoomstart', () => document.getElementById('map').classList.add('nozoomanim'));
-map.on('zoomend', () => setTimeout(() => document.getElementById('map').classList.remove('nozoomanim'), 60));
 
 async function poll() {
   try {
