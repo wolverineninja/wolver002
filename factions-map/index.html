@@ -341,7 +341,7 @@ function renderList(players) {
     if (!p) continue;
     el.querySelector('.s').textContent = p.PlayTime || '';
     const pos = p.Pose?.Head?.Position;
-    el.querySelector('.pgslot').textContent = pos ? `${Math.floor(pos[0])}, ${Math.floor(pos[2])}` : '';
+    el.querySelector('.pgslot').textContent = pos ? `${Math.floor(pos[0])}, ${Math.floor(pos[1])}, ${Math.floor(pos[2])}` : '';
   }
   syncSel();
 }
