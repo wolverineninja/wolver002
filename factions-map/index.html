@@ -466,13 +466,22 @@ function updateMarkers(players) {
   }
 }
 
+// "1h 2m 53s" -> total seconds, for sorting the player list by time online
+function playSecs(s) {
+  s = s || ''; let t = 0, m;
+  if (m = /(\d+)\s*h/.exec(s)) t += +m[1] * 3600;
+  if (m = /(\d+)\s*m/.exec(s)) t += +m[1] * 60;
+  if (m = /(\d+)\s*s/.exec(s)) t += +m[1];
+  return t;
+}
+
 let rosterKey = '';
 function renderList(players) {
   const list = document.getElementById('playerList');
   document.getElementById('onlineCount').textContent = players.length;
   document.getElementById('playerCount').textContent = players.length ? `Players — ${players.length}` : 'Players';
   if (!players.length) { list.innerHTML = '<div class=pempty>No players online</div>'; rosterKey = ''; return; }
-  const sorted = [...players].sort((a, b) => (a.Username || '').localeCompare(b.Username || ''));
+  const sorted = [...players].sort((a, b) => playSecs(b.PlayTime) - playSecs(a.PlayTime)); // longest on top
   const key = sorted.map(p => `${p.id}:${p.SkinId}`).join(',');
   if (key !== rosterKey) {
     rosterKey = key;
