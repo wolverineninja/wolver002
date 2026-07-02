@@ -65,6 +65,7 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 .it .nm{flex:1;min-width:0}
 .it .nm .u{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:2px 2px #3e3e3e}
 .it .nm .s{font-size:12px;color:#aaa;text-shadow:2px 2px #2a2a2a}
+.it .pgslot{font-size:12px;color:#aaa;text-shadow:2px 2px #2a2a2a;text-align:right;flex:none;white-space:nowrap}
 .pempty{color:#aaa;font-size:14px;text-align:center;padding:14px 0;text-shadow:2px 2px #2a2a2a}
 
 /* ── F3-style coords, bottom left ── */
@@ -249,14 +250,6 @@ function headHtml(skinId) {
 }
 function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-// MC tab-list connection bars: 5 green bars by ping
-function pingBars(ping) {
-  const lit = ping < 150 ? 5 : ping < 300 ? 4 : ping < 600 ? 3 : ping < 1000 ? 2 : 1;
-  let h = '';
-  for (let i = 0; i < 5; i++) h += `<i style="height:${6+i*3}px" class="${i < lit ? 'on' : ''}"></i>`;
-  return `<span class=bars title="${Math.round(ping)}ms">${h}</span>`;
-}
-
 function markerIcon(p, selected) {
   const heading = p.Pose?.Heading ?? 0;
   return L.divIcon({
@@ -347,7 +340,8 @@ function renderList(players) {
     const p = sorted.find(q => q.id === Number(el.dataset.id));
     if (!p) continue;
     el.querySelector('.s').textContent = p.PlayTime || '';
-    el.querySelector('.pgslot').innerHTML = pingBars(p.ping || 0);
+    const pos = p.Pose?.Head?.Position;
+    el.querySelector('.pgslot').textContent = pos ? `${Math.floor(pos[0])}, ${Math.floor(pos[2])}` : '';
   }
   syncSel();
 }
