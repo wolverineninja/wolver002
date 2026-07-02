@@ -138,6 +138,16 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 .dbit{display:flex;align-items:center;gap:8px;padding:5px 7px;cursor:pointer;background:rgba(255,255,255,.08);border:2px solid transparent}
 .dbit:hover{background:rgba(255,255,255,.2)}
 .dbit.on{border-color:#fff;background:rgba(255,255,255,.16)}
+/* session dropdown rows (under an expanded player) */
+.sessit{display:flex;align-items:center;gap:8px;padding:4px 7px 5px 16px;cursor:pointer;
+  background:rgba(255,255,255,.05);border:2px solid transparent}
+.sessit:hover{background:rgba(255,255,255,.18)}
+.sessit.on{border-color:#fff;background:rgba(255,255,255,.14)}
+.sessit .sq{width:10px;height:10px;flex:none;box-shadow:0 0 0 2px rgba(0,0,0,.6)}
+.sessit .t{font-size:13px;text-shadow:1px 1px #2a2a2a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sessit .t .s2{font-size:11px;color:#aaa;display:block}
+.sessctl{display:flex;gap:6px;padding:5px 7px 6px 16px;background:rgba(255,255,255,.05)}
+.sessctl .mcbtn{font-size:12px;padding:3px 10px 5px;flex:1}
 /* session trail end-dot + nametag */
 .strail{position:relative}
 .strail .sdot{position:absolute;left:-6px;top:-6px;width:8px;height:8px;border:2px solid rgba(0,0,0,.7);
@@ -277,7 +287,7 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 
 <div id=sessPanel>
   <h4>Sessions</h4>
-  <div class=dbnote>Everywhere a player went, one trail per join. Their last 3 sessions are kept &mdash; each rejoin rolls the oldest off. <span style=color:#ffff55>Yellow</span> = latest, <span style=color:#ff9a3b>orange</span> = before, <span style=color:#9a9a9a>gray</span> = oldest. Click a player again to hide.</div>
+  <div class=dbnote>Click a player to list their last 3 join sessions (each rejoin rolls the oldest off). Click a session and its path draws from start to finish &mdash; Stop hides it, Finish skips the drawing.</div>
   <input id=sessSearch placeholder="Search player..." oninput=renderSessList() autocomplete=off spellcheck=false>
   <div id=sessList><div class=pempty>Open to load...</div></div>
 </div>
@@ -785,8 +795,8 @@ function selectBase(id) {
 // ═══ Sessions (per-join trails: kept until the player rejoins 3 times) ═══
 const SESS_API = 'https://admin.wolver002.com/factions/api/sessions';
 const SESS_COLORS = ['#9a9a9a', '#ff9a3b', '#ffff55'];   // oldest -> newest
-let sessOpen = false, sessTimer = null, sessTrailTimer = null;
-let sessPlayers = [], sessSel = null, sessLayers = [];
+let sessOpen = false, sessTimer = null;
+let sessPlayers = [], sessSel = null, sessData = null, sessPlay = null;
 
 function toggleSessPanel() {
   sessOpen = !sessOpen;
@@ -805,6 +815,8 @@ async function refreshSessList() {
   catch (e) { return; }
   renderSessList();
 }
+const fmtDur = t => { const m = Math.max(1, Math.round(t / 60)); return m < 60 ? m + 'min' : Math.floor(m / 60) + 'h ' + m % 60 + 'min'; };
+
 function renderSessList() {
   const list = document.getElementById('sessList');
   const q = (document.getElementById('sessSearch').value || '').trim().toLowerCase();
@@ -812,50 +824,120 @@ function renderSessList() {
   const rows = sessPlayers.filter(p => (p.username || '').toLowerCase().includes(q));
   if (!rows.length) { list.innerHTML = '<div class=pempty>No players match</div>'; return; }
   const now = Math.floor(Date.now() / 1000);
-  list.innerHTML = rows.map(p => `
+  let html = '';
+  for (const p of rows) {
+    html += `
     <div class="dbit${sessSel === p.username ? ' on' : ''}" data-name="${escapeHtml(p.username)}">
       <span class=nm>
         <div class=u style="${adminStyle(p.username, 2)}">${escapeHtml(p.username)}</div>
         <div class=s>seen ${fmtAgo(Math.max(0, now - p.lastSeen))}</div>
       </span>
-    </div>`).join('');
-  list.querySelectorAll('.dbit').forEach(el => el.addEventListener('click', () => selectSession(el.dataset.name)));
+    </div>`;
+    if (sessSel !== p.username) continue;
+    // dropdown: this player's sessions, newest on top
+    if (!sessData) { html += '<div class=pempty>Loading...</div>'; continue; }
+    const ss = sessData.sessions || [];
+    if (!ss.length) { html += '<div class=pempty>No sessions tracked</div>'; continue; }
+    for (let i = ss.length - 1; i >= 0; i--) {
+      const s = ss[i];
+      const col = SESS_COLORS[SESS_COLORS.length - ss.length + i] || SESS_COLORS[0];
+      const active = sessPlay && sessPlay.idx === i;
+      html += `
+      <div class="sessit${active ? ' on' : ''}" data-i="${i}">
+        <span class=sq style="background:${col}"></span>
+        <span class=t>${s.live ? '<span class=yellow>LIVE</span> &middot; ' : ''}joined ${fmtAgo(Math.max(0, now - s.start))}
+          <span class=s2>${fmtDur(s.end - s.start)} online</span></span>
+      </div>`;
+      if (active) html += `
+      <div class=sessctl>
+        <button class=mcbtn onclick=stopSessPlay()>Stop</button>
+        <button class=mcbtn onclick=finishSessPlay()>Finish</button>
+      </div>`;
+    }
+  }
+  list.innerHTML = html;
+  list.querySelectorAll('.dbit').forEach(el => el.addEventListener('click', () => selectSessPlayer(el.dataset.name)));
+  list.querySelectorAll('.sessit').forEach(el => el.addEventListener('click', () => startSessPlay(Number(el.dataset.i))));
 }
-function clearSessTrails() {
-  sessLayers.forEach(l => map.removeLayer(l)); sessLayers = [];
-  clearInterval(sessTrailTimer); sessTrailTimer = null;
-  sessSel = null;
-}
-function selectSession(name) {
-  if (sessSel === name) { clearSessTrails(); renderSessList(); return; }   // toggle off
-  clearSessTrails();
-  sessSel = name;
+
+// click a name -> expand/collapse their session dropdown
+async function selectSessPlayer(name) {
+  if (sessSel === name) { sessSel = null; sessData = null; clearSessPlay(); renderSessList(); return; }
+  clearSessPlay();
+  sessSel = name; sessData = null;
   renderSessList();
-  drawSessTrails(name, true);
-  sessTrailTimer = setInterval(() => drawSessTrails(name, false), 30000);  // a live session keeps growing
-}
-async function drawSessTrails(name, fit) {
   let d;
   try { d = await (await fetch(`${SESS_API}?name=${encodeURIComponent(name)}`, { cache: 'no-store' })).json(); }
+  catch (e) { d = { sessions: [] }; }
+  if (sessSel !== name) return;                        // collapsed while fetching
+  sessData = d;
+  renderSessList();
+}
+
+function sessTagIcon(color, text) {
+  return L.divIcon({ className: '', iconSize: [0, 0], html:
+    `<div class=strail><div class=sdot style="background:${color}"></div>` +
+    (text ? `<div class=slabel style="color:${color}">${text}</div>` : '') + '</div>' });
+}
+// click a session -> its trail draws itself from start to finish
+function startSessPlay(i) {
+  clearSessPlay();
+  const s = sessData?.sessions?.[i]; if (!s) return;
+  const ss = sessData.sessions;
+  const col = SESS_COLORS[SESS_COLORS.length - ss.length + i] || SESS_COLORS[0];
+  const lls = s.points.map(([x, y, z]) => toLatLng(x, z));
+  const under = L.polyline([], { color: '#000', weight: 5, opacity: .55, interactive: false }).addTo(map);
+  const line = L.polyline([], { color: col, weight: 2, opacity: .95, interactive: false }).addTo(map);
+  const startDot = L.marker(lls[0], { icon: sessTagIcon(col, 'start'), zIndexOffset: 1500, interactive: false }).addTo(map);
+  const head = L.marker(lls[0], { icon: sessTagIcon(col, ''), zIndexOffset: 1600, interactive: false }).addTo(map);
+  sessPlay = { idx: i, name: sessSel, startTs: s.start, endTs: s.end, live: s.live, col, lls,
+               under, line, head, startDot, drawn: 1, t0: Date.now(), timer: null, refresh: null, done: false };
+  map.fitBounds(L.latLngBounds(lls), { maxZoom: BASE_ZOOM - 1, animate: false });
+  sessPlay.timer = setInterval(advanceSessPlay, 30);   // time-based: ~4.5s draw regardless of length
+  advanceSessPlay();
+  renderSessList();
+}
+function advanceSessPlay() {
+  const p = sessPlay; if (!p || p.done) return;
+  const frac = Math.min(1, (Date.now() - p.t0) / 4500);
+  p.drawn = Math.max(1, Math.ceil(frac * p.lls.length));
+  const seg = p.lls.slice(0, p.drawn);
+  p.under.setLatLngs(seg); p.line.setLatLngs(seg);
+  p.head.setLatLng(seg[seg.length - 1]);
+  if (frac >= 1) {                                     // reached the end: mark the finish
+    clearInterval(p.timer); p.timer = null; p.done = true;
+    const now = Math.floor(Date.now() / 1000);
+    p.head.setIcon(sessTagIcon(p.col, p.live ? 'online now' : `finish &middot; ${fmtAgo(Math.max(0, now - p.endTs))}`));
+    if (p.live) p.refresh = setInterval(extendLiveTrail, 30000);   // keep growing while they play
+  }
+}
+function finishSessPlay() { if (sessPlay && !sessPlay.done) { sessPlay.t0 = -Infinity; advanceSessPlay(); } }
+function stopSessPlay() { clearSessPlay(); renderSessList(); }
+function clearSessPlay() {
+  const p = sessPlay; if (!p) return;
+  clearInterval(p.timer); clearInterval(p.refresh);
+  [p.under, p.line, p.head, p.startDot].forEach(l => map.removeLayer(l));
+  sessPlay = null;
+}
+// a live session's line keeps extending as new samples come in
+async function extendLiveTrail() {
+  const p = sessPlay; if (!p || !p.done || !p.live) return;
+  let d;
+  try { d = await (await fetch(`${SESS_API}?name=${encodeURIComponent(p.name)}`, { cache: 'no-store' })).json(); }
   catch (e) { return; }
-  if (sessSel !== name) return;                       // deselected while fetching
-  sessLayers.forEach(l => map.removeLayer(l)); sessLayers = [];
-  const ss = d.sessions || [];
-  if (!ss.length) return;
-  const now = Math.floor(Date.now() / 1000);
-  let newestLls = null;
-  ss.forEach((s, i) => {
-    const lls = s.points.map(([x, y, z]) => toLatLng(x, z));
-    const col = SESS_COLORS[SESS_COLORS.length - ss.length + i] || SESS_COLORS[0];
-    sessLayers.push(L.polyline(lls, { color: '#000', weight: 5, opacity: .55, interactive: false }).addTo(map));
-    sessLayers.push(L.polyline(lls, { color: col, weight: 2, opacity: .95, interactive: false }).addTo(map));
-    const endIcon = L.divIcon({ className: '', iconSize: [0, 0], html:
-      `<div class=strail><div class=sdot style="background:${col}"></div><div class=slabel style="color:${col}">` +
-      `${escapeHtml(name)} &middot; ${s.live ? 'online now' : fmtAgo(Math.max(0, now - s.end))}</div></div>` });
-    sessLayers.push(L.marker(lls[lls.length - 1], { icon: endIcon, zIndexOffset: 1500, interactive: false }).addTo(map));
-    newestLls = lls;
-  });
-  if (fit && newestLls.length) map.fitBounds(L.latLngBounds(newestLls), { maxZoom: BASE_ZOOM - 1, animate: false });
+  if (sessPlay !== p) return;
+  const s = (d.sessions || []).find(x => x.start === p.startTs);
+  if (!s) { clearInterval(p.refresh); p.refresh = null; return; }  // session rolled off
+  sessData = d;
+  p.lls = s.points.map(([x, y, z]) => toLatLng(x, z));
+  p.endTs = s.end; p.live = s.live;
+  p.under.setLatLngs(p.lls); p.line.setLatLngs(p.lls);
+  p.head.setLatLng(p.lls[p.lls.length - 1]);
+  if (!p.live) {                                       // they logged off while we watched
+    clearInterval(p.refresh); p.refresh = null;
+    p.head.setIcon(sessTagIcon(p.col, `finish &middot; ${fmtAgo(Math.max(0, Math.floor(Date.now() / 1000) - p.endTs))}`));
+    renderSessList();
+  }
 }
 
 async function poll() {
