@@ -257,7 +257,6 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
   <h4>Extensions</h4>
   <button class=mcbtn data-ext=y onclick="toggleExt('y')">Y Axis: OFF</button>
   <button class=mcbtn data-ext=heat onclick="toggleExt('heat')">Heatmap: OFF</button>
-  <button class=mcbtn id=heatModeBtn onclick=toggleHeatMode()>Heat Mode: LIVE</button>
   <button class=mcbtn onclick=startWpPlace()>Add Waypoint</button>
 </div>
 
@@ -643,61 +642,30 @@ function cancelWpPlace() {
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && wpPlaceMode) cancelWpPlace(); });
 
-// ═══ Heatmap — same behavior as crimson's map: Live = currently online players,
-// 7d = aggregated tracked positions ("7-day trails") ═══
-const HEAT_API = 'https://admin.wolver002.com/factions/api/heatmap';
+// ═══ Heatmap — crimson-style glow under live players, with a strict 10-second
+// trail: heat cools and vanishes 10s after a player leaves a spot ═══
 const HEAT_GRADIENT = { .1: '#0ea5e9', .3: '#22c55e', .55: '#eab308', .8: '#f97316', 1: '#dc2626' };
-let heatLayer = null, heatTimer = null;
-let heatMode = localStorage.getItem('heatMode') === '7d' ? '7d' : 'live';
+const HEAT_TRAIL_MS = 10000;
+let heatLayer = null, heatPts = [];   // {t, lat, lng} samples from recent polls
 
-function heatOpts() {
-  return heatMode === '7d'
-    ? { radius: 22, blur: 18, max: 4, maxZoom: BASE_ZOOM - 1, minOpacity: .35, gradient: HEAT_GRADIENT }
-    : { radius: 40, blur: 28, max: 1, maxZoom: BASE_ZOOM - 1, minOpacity: .35, gradient: HEAT_GRADIENT };
-}
-function setHeatPts(pts) {
-  if (!heatLayer) heatLayer = L.heatLayer(pts, heatOpts()).addTo(map);
-  else heatLayer.setLatLngs(pts);
-}
-// live: a full-strength glow under everyone online right now, repainted every poll
-function heatLive() {
-  const pts = [];
+function heatTick() {
+  const now = Date.now();
   for (const p of lastPlayers) {
     const pos = p.Pose?.Head?.Position; if (!pos) continue;
     const ll = toLatLng(pos[0], pos[2]);
-    pts.push([ll[0], ll[1], 1]);
+    heatPts.push({ t: now, lat: ll[0], lng: ll[1] });
   }
-  setHeatPts(pts);
+  heatPts = heatPts.filter(q => now - q.t <= HEAT_TRAIL_MS);
+  if (heatLayer) heatLayer.setLatLngs(
+    heatPts.map(q => [q.lat, q.lng, Math.max(.15, 1 - (now - q.t) / HEAT_TRAIL_MS)]));
 }
-// 7d: every tracked sample adds 0.6 heat to its cell, saturating where players linger
-async function heat7d() {
-  let d;
-  try { d = await (await fetch(HEAT_API + '?window=604800', { cache: 'no-store' })).json(); }
-  catch (e) { return; }
-  if (!ext.heat || heatMode !== '7d') return;   // toggled away while fetching
-  setHeatPts((d.cells || []).map(([x, z, w]) => { const ll = toLatLng(x, z); return [ll[0], ll[1], w * .6]; }));
+function startHeatmap() {
+  if (!heatLayer) heatLayer = L.heatLayer([], {
+    radius: 40, blur: 28, max: 1, maxZoom: BASE_ZOOM - 1, minOpacity: .35, gradient: HEAT_GRADIENT
+  }).addTo(map);
+  heatTick();
 }
-function applyHeatMode() {
-  if (heatLayer) { map.removeLayer(heatLayer); heatLayer = null; }  // radius/max differ per mode
-  clearInterval(heatTimer); heatTimer = null;
-  if (!ext.heat) return;
-  if (heatMode === 'live') heatLive();
-  else { heat7d(); heatTimer = setInterval(heat7d, 60000); }
-}
-function startHeatmap() { applyHeatMode(); }
-function stopHeatmap() { clearInterval(heatTimer); heatTimer = null; if (heatLayer) { map.removeLayer(heatLayer); heatLayer = null; } closeAt(); }
-function syncHeatModeBtn() {
-  const b = document.getElementById('heatModeBtn');
-  b.textContent = `Heat Mode: ${heatMode === 'live' ? 'LIVE' : '7-DAY'}`;
-  b.title = heatMode === 'live' ? 'Only currently online players' : 'Aggregated player positions from the last 7 days';
-}
-function toggleHeatMode() {
-  heatMode = heatMode === 'live' ? '7d' : 'live';
-  localStorage.setItem('heatMode', heatMode);
-  syncHeatModeBtn();
-  applyHeatMode();
-}
-syncHeatModeBtn();
+function stopHeatmap() { heatPts = []; if (heatLayer) { map.removeLayer(heatLayer); heatLayer = null; } closeAt(); }
 if (ext.heat) startHeatmap();
 
 // click a heated area (heatmap on) to see who's been there
@@ -807,7 +775,7 @@ async function poll() {
     document.getElementById('connBars').querySelectorAll('i').forEach(b => b.classList.add('on'));
     updateMarkers(lastPlayers);
     renderList(lastPlayers);
-    if (ext.heat && heatMode === 'live') heatLive();
+    if (ext.heat) heatTick();
   } catch (e) {
     const cb = document.getElementById('connBars');
     cb.classList.add('bad');
