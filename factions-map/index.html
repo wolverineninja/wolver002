@@ -156,7 +156,7 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 #load .msg{font-size:20px;color:#ddd;text-shadow:2px 2px #373737}
 
 @media(max-width:820px){
-  .mcfield,#gobtn{display:none}
+  .mcfield{display:none}
   #bar .sub{display:none}
   #side{width:212px}
 }
@@ -176,7 +176,6 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
   <div class=mcfield><span class=lab>Z</span><input id=gotoZ type=number placeholder=0></div>
   <button class=mcbtn id=extbtn onclick=toggleExtPanel()>Extensions</button>
   <button class=mcbtn id=dbbtn onclick=toggleDbPanel()>2atabase</button>
-  <button class=mcbtn id=gobtn onclick=goToCoords()>Go</button>
   <button class=mcbtn onclick=refreshTiles()>Reload</button>
   <button class=mcbtn onclick=toggleSidebar()>List</button>
   <div class=online>
