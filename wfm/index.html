@@ -287,7 +287,7 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 
 <div id=sessPanel>
   <h4>Sessions</h4>
-  <div class=dbnote>Click a player to list their last 3 join sessions (each rejoin rolls the oldest off). Click a session and its path draws from start to finish &mdash; Stop hides it, Finish skips the drawing.</div>
+  <div class=dbnote>Click a player to list their last 3 join sessions (each rejoin rolls the oldest off). Click a session and its path draws from start to finish &mdash; Rewind plays it backwards, Finish skips to the end. Click the player's name again to hide the trail.</div>
   <input id=sessSearch placeholder="Search player..." oninput=renderSessList() autocomplete=off spellcheck=false>
   <div id=sessList><div class=pempty>Open to load...</div></div>
 </div>
@@ -795,7 +795,7 @@ function selectBase(id) {
 // ═══ Sessions (per-join trails: kept until the player rejoins 3 times) ═══
 const SESS_API = 'https://admin.wolver002.com/factions/api/sessions';
 const SESS_COLORS = ['#9a9a9a', '#ff9a3b', '#ffff55'];   // oldest -> newest
-const SESS_SPEEDS = [['1x', 4], ['2x', 8], ['5x', 20], ['10x', 40]];   // label, trail points drawn per second
+const SESS_SPEEDS = [['1x', .4], ['2x', .8], ['5x', 2], ['10x', 4], ['25x', 10], ['50x', 20]];   // label, trail points drawn per second
 let sessSpeedIdx = Math.min(SESS_SPEEDS.length - 1, +localStorage.getItem('sessSpeedIdx') || 0);
 let sessOpen = false, sessTimer = null;
 let sessPlayers = [], sessSel = null, sessData = null, sessPlay = null;
@@ -852,7 +852,7 @@ function renderSessList() {
       </div>`;
       if (active) html += `
       <div class=sessctl>
-        <button class=mcbtn onclick=stopSessPlay()>Stop</button>
+        <button class=mcbtn onclick=rewindSessPlay()>Rewind</button>
         <button class=mcbtn id=sessSpeedBtn onclick=cycleSessSpeed() title="Replay speed">${SESS_SPEEDS[sessSpeedIdx][0]}</button>
         <button class=mcbtn onclick=finishSessPlay()>Finish</button>
       </div>`;
@@ -894,7 +894,7 @@ function startSessPlay(i) {
   const startDot = L.marker(lls[0], { icon: sessTagIcon(col, 'start'), zIndexOffset: 1500, interactive: false }).addTo(map);
   const head = L.marker(lls[0], { icon: sessTagIcon(col, ''), zIndexOffset: 1600, interactive: false }).addTo(map);
   sessPlay = { idx: i, name: sessSel, startTs: s.start, endTs: s.end, live: s.live, col, lls,
-               under, line, head, startDot, drawn: 1, prog: 1, last: Date.now(), timer: null, refresh: null, done: false };
+               under, line, head, startDot, drawn: 1, prog: 1, dir: 1, last: Date.now(), timer: null, refresh: null, done: false };
   map.fitBounds(L.latLngBounds(lls), { maxZoom: BASE_ZOOM - 1, animate: false });
   sessPlay.timer = setInterval(advanceSessPlay, 30);   // time-based, speed set by the ×-button
   advanceSessPlay();
@@ -903,27 +903,44 @@ function startSessPlay(i) {
 function advanceSessPlay() {
   const p = sessPlay; if (!p || p.done) return;
   const now = Date.now();
-  p.prog = Math.min(p.lls.length, p.prog + (now - p.last) / 1000 * SESS_SPEEDS[sessSpeedIdx][1]);
+  p.prog = Math.max(1, Math.min(p.lls.length,
+    p.prog + p.dir * (now - p.last) / 1000 * SESS_SPEEDS[sessSpeedIdx][1]));
   p.last = now;
   p.drawn = Math.max(1, Math.ceil(p.prog));
   const seg = p.lls.slice(0, p.drawn);
   p.under.setLatLngs(seg); p.line.setLatLngs(seg);
   p.head.setLatLng(seg[seg.length - 1]);
-  if (p.drawn >= p.lls.length) {                       // reached the end: mark the finish
+  if (p.dir > 0 && p.drawn >= p.lls.length) {          // reached the end: mark the finish
     clearInterval(p.timer); p.timer = null; p.done = true;
     const nowS = Math.floor(Date.now() / 1000);
     p.head.setIcon(sessTagIcon(p.col, p.live ? 'online now' : `finish &middot; ${fmtAgo(Math.max(0, nowS - p.endTs))}`));
     if (p.live) p.refresh = setInterval(extendLiveTrail, 30000);   // keep growing while they play
+  } else if (p.dir < 0 && p.prog <= 1) {               // rewound all the way: rest at the start
+    clearInterval(p.timer); p.timer = null; p.dir = 1;
   }
 }
-function finishSessPlay() { if (sessPlay && !sessPlay.done) { sessPlay.prog = sessPlay.lls.length; advanceSessPlay(); } }
+// un-draws the trail backwards from wherever it is; click the session row to replay
+function rewindSessPlay() {
+  const p = sessPlay; if (!p) return;
+  if (p.done) {                                        // finished trail: bring the head back
+    p.done = false;
+    clearInterval(p.refresh); p.refresh = null;
+    p.head.setIcon(sessTagIcon(p.col, ''));
+  }
+  p.dir = -1; p.last = Date.now();
+  if (!p.timer) p.timer = setInterval(advanceSessPlay, 30);
+}
+function finishSessPlay() {
+  const p = sessPlay; if (!p || p.done) return;
+  p.dir = 1; p.prog = p.lls.length;
+  advanceSessPlay();
+}
 function cycleSessSpeed() {
   sessSpeedIdx = (sessSpeedIdx + 1) % SESS_SPEEDS.length;   // takes effect mid-draw too
   localStorage.setItem('sessSpeedIdx', sessSpeedIdx);
   const b = document.getElementById('sessSpeedBtn');
   if (b) b.textContent = SESS_SPEEDS[sessSpeedIdx][0];
 }
-function stopSessPlay() { clearSessPlay(); renderSessList(); }
 function clearSessPlay() {
   const p = sessPlay; if (!p) return;
   clearInterval(p.timer); clearInterval(p.refresh);
