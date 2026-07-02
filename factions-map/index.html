@@ -310,7 +310,7 @@ function updateMarkers(players) {
         }
       }
     }
-    if (followId === p.id) map.panTo(ll, { animate: true, duration: 0.4 });
+    if (followId === p.id) map.panTo(ll, { animate: false });
   }
   for (const [id, m] of markers) {
     if (!seen.has(id)) { map.removeLayer(m.marker); markers.delete(id); if (followId === id) stopFollow(); }
