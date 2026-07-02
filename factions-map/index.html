@@ -318,6 +318,20 @@ function headHtml(skinId) {
 }
 function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
+// Admins get a colored name (yellow, frikilul blue). [color, shadow] — matched case-insensitively.
+const ADMINS = {
+  luminexreal:   ['#ffff55', '#3e3e15'],
+  frikilul:      ['#5c6bff', '#171a3e'],
+  shoemake82:    ['#ffff55', '#3e3e15'],
+  skeletonangel: ['#ffff55', '#3e3e15'],
+  burningalpaca: ['#ffff55', '#3e3e15'],
+  realdowd:      ['#ffff55', '#3e3e15'],
+};
+function adminStyle(name, px) {
+  const a = ADMINS[(name || '').toLowerCase()];
+  return a ? `color:${a[0]};text-shadow:${px}px ${px}px ${a[1]}` : '';
+}
+
 function markerIcon(p, selected) {
   const heading = p.Pose?.Heading ?? 0;
   return L.divIcon({
@@ -325,7 +339,7 @@ function markerIcon(p, selected) {
     html: `<div class="pmarker${selected ? ' sel' : ''}">
       <div class=arrow style="transform:rotate(${-heading}deg)"></div>
       <div class=mhead>${headHtml(p.SkinId)}</div>
-      <div class=mname>${escapeHtml(p.Username || '?')}</div>
+      <div class=mname style="${adminStyle(p.Username, 1)}">${escapeHtml(p.Username || '?')}</div>
     </div>`
   });
 }
@@ -391,7 +405,7 @@ function renderList(players) {
     list.innerHTML = sorted.map(p => `
       <div class=it data-id="${p.id}">
         <span class=gi>${headHtml(p.SkinId)}</span>
-        <span class=nm><div class=u>${escapeHtml(p.Username || '?')}</div><div class=s></div></span>
+        <span class=nm><div class=u style="${adminStyle(p.Username, 2)}">${escapeHtml(p.Username || '?')}</div><div class=s></div></span>
         <span class=pgslot></span>
       </div>`).join('');
     list.querySelectorAll('.it').forEach(el => el.addEventListener('click', () => {
