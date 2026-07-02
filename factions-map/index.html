@@ -134,6 +134,22 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 .dbit .s{font-size:11px;color:#aaa;text-shadow:1px 1px #2a2a2a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dbconf{font-size:13px;color:#ffd98a;text-shadow:1px 1px #4a3410;flex:none}
 
+/* ── credits ── */
+#creditsBtn{position:fixed;right:12px;bottom:12px;z-index:26;font-family:MC,monospace;font-size:12px;
+  color:#9a9a9a;text-shadow:1px 1px #000;background:rgba(0,0,0,.5);border:2px solid #000;
+  padding:3px 9px 5px;cursor:pointer}
+#creditsBtn:hover{color:#fff}
+#creditsModal{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.6)}
+#creditsModal.open{display:flex}
+#creditsModal .cbox{width:min(92vw,390px);background:rgba(12,12,12,.97);border:2px solid #000;
+  box-shadow:0 0 0 2px #4a4a4a,0 0 0 4px #000;padding:16px 18px 18px}
+#creditsModal h4{font-size:19px;text-align:center;color:#ffff55;text-shadow:2px 2px #3e3e15;margin-bottom:14px}
+#creditsModal .crow{margin-bottom:12px;line-height:1.4}
+#creditsModal .crow b{display:block;font-size:15px;color:#fff;text-shadow:2px 2px #3e3e3e}
+#creditsModal .crow span{font-size:12px;color:#bbb;text-shadow:1px 1px #1a1a1a}
+#creditsModal .crow a{color:#ffd98a;text-shadow:1px 1px #4a3410}
+#creditsModal .cbox .mcbtn{display:block;width:100%;margin-top:4px;font-size:14px}
+
 /* ── dirt loading screen ── */
 #load{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:14px;background:#000;transition:opacity .4s;image-rendering:pixelated}
@@ -191,6 +207,17 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
   <div class=dbnote>Still collecting &amp; analyzing data &mdash; it will likely take 1 week+ of tracking to get accurate base coordinates.</div>
   <input id=dbSearch placeholder="Search player..." oninput=renderDbList() autocomplete=off spellcheck=false>
   <div id=dbList><div class=pempty>Open to load...</div></div>
+</div>
+
+<button id=creditsBtn onclick=toggleCredits()>Credits</button>
+<div id=creditsModal onclick="if(event.target===this)toggleCredits()">
+  <div class=cbox>
+    <h4>Credits</h4>
+    <div class=crow><b>s1rnightfall</b><span>The entire idea for the map</span></div>
+    <div class=crow><b>Baddy.crimson</b><span>Gave me the passion to make the map</span></div>
+    <div class=crow><b>M4/T4</b><span>Kinda ripped the name from him bec i like it &mdash; go to <a href="http://84.46.250.118:5000/4atabase" target=_blank rel="noopener noreferrer">84.46.250.118:5000/4atabase</a> to see the original</span></div>
+    <button class=mcbtn onclick=toggleCredits()>Close</button>
+  </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -309,6 +336,8 @@ function toggleExtPanel() {
   }
 }
 syncExtButtons();
+
+function toggleCredits() { document.getElementById('creditsModal').classList.toggle('open'); }
 
 let sidebarOpen = true;
 function toggleSidebar() {
