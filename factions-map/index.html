@@ -142,6 +142,12 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
   text-shadow:1px 1px #04222a;background:rgba(0,0,0,.5);padding:0 5px 2px;pointer-events:none}
 #wpHint{position:fixed;right:12px;bottom:12px;z-index:16;font-family:MC,monospace;font-size:11px;
   color:#7c8a8c;text-shadow:1px 1px #000;background:rgba(0,0,0,.4);padding:3px 8px 5px;pointer-events:none}
+#wpBanner{position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:40;display:none;
+  font-family:MC,monospace;font-size:14px;color:#c3f4f8;text-shadow:2px 2px #04222a;
+  background:rgba(0,0,0,.82);border:2px solid #000;box-shadow:0 0 0 2px #2a6b72;padding:7px 14px 9px}
+#wpBanner.on{display:block}
+#wpBanner .cx{color:#ff9a9a;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+#wpBanner .cx:hover{color:#fff}
 
 /* ── "seen here" popup (heatmap click) ── */
 #atPopup{position:fixed;z-index:30;display:none;width:236px;max-height:300px;flex-direction:column;
@@ -227,6 +233,7 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
   <h4>Extensions</h4>
   <button class=mcbtn data-ext=y onclick="toggleExt('y')">Y Axis: OFF</button>
   <button class=mcbtn data-ext=heat onclick="toggleExt('heat')">Heatmap: OFF</button>
+  <button class=mcbtn onclick=startWpPlace()>Add Waypoint</button>
 </div>
 
 <div id=dbPanel>
@@ -237,6 +244,7 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 </div>
 
 <div id=wpHint>right-click map: add waypoint</div>
+<div id=wpBanner>Click anywhere on the map to add a waypoint &middot; <span class=cx onclick=cancelWpPlace()>cancel</span></div>
 <div id=atPopup>
   <div class=at-head><span id=atTitle></span><span class=stop onclick=closeAt()>x</span></div>
   <div id=atList></div>
@@ -554,6 +562,21 @@ map.on('contextmenu', e => {
 });
 renderWaypoints();
 
+// "Add Waypoint" from Extensions: arm place-mode, then the next map click drops one
+let wpPlaceMode = false;
+function startWpPlace() {
+  wpPlaceMode = true;
+  document.getElementById('extPanel').classList.remove('open');
+  document.getElementById('wpBanner').classList.add('on');
+  document.getElementById('map').style.cursor = 'crosshair';
+}
+function cancelWpPlace() {
+  wpPlaceMode = false;
+  document.getElementById('wpBanner').classList.remove('on');
+  document.getElementById('map').style.cursor = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && wpPlaceMode) cancelWpPlace(); });
+
 // ═══ Heatmap ═══
 const HEAT_API = 'https://admin.wolver002.com/factions/api/heatmap';
 let heatLayer = null, heatTimer = null;
@@ -580,6 +603,11 @@ const fmtAgo = s => s < 60 ? s + 's ago' : s < 3600 ? Math.round(s / 60) + 'm ag
 function closeAt() { document.getElementById('atPopup').classList.remove('open'); }
 
 map.on('click', async e => {
+  if (wpPlaceMode) {                       // placing a waypoint takes priority
+    cancelWpPlace();
+    addWaypoint(e.latlng.lng / UPB, -e.latlng.lat / UPB);
+    return;
+  }
   if (!ext.heat) return;
   const x = Math.round(e.latlng.lng / UPB), z = Math.round(-e.latlng.lat / UPB);
   const panel = document.getElementById('atPopup');
