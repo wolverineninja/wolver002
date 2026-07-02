@@ -7,167 +7,150 @@
 <title>Wolver Factions Map</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
-:root{
-  --bg:#0c0d11; --panel:#15171d; --panel2:#1b1e25; --line:#2a2e37; --line2:#363b46;
-  --txt:#e9eaee; --dim:#878d9b; --dim2:#5f6573; --accent:#c79a55; --accent-d:#8c6a35;
-  --good:#79c8a0; --bad:#c86a6a;
-}
+@font-face{font-family:MC;src:url(Minecraft.otf);font-weight:normal}
+@font-face{font-family:MC;src:url(Minecraft-Bold.otf);font-weight:bold}
+
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
-  font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-  -webkit-font-smoothing:antialiased}
-.mono{font-family:ui-monospace,"SF Mono","Cascadia Mono","JetBrains Mono",Menlo,Consolas,monospace}
-#map{position:fixed;inset:0;background:#101118;cursor:grab}
+html,body{height:100%;overflow:hidden;background:#000}
+body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth:never}
+.sh{text-shadow:2px 2px #3e3e3e}         /* classic MC text shadow (25% brightness) */
+.gray{color:#aaa;text-shadow:2px 2px #2a2a2a}
+.yellow{color:#ffff55;text-shadow:2px 2px #3e3e15}
+
+#map{position:fixed;inset:0;background:#000;cursor:grab}
 #map:active{cursor:grabbing}
-.leaflet-container{background:#101118;font:inherit}
-.panel{position:fixed;background:var(--panel);border:1px solid var(--line);border-radius:12px;
-  box-shadow:0 12px 40px -12px rgba(0,0,0,.7),0 0 0 1px rgba(0,0,0,.2)}
+.leaflet-container{background:#000;font:inherit}
 
-/* top bar */
-#bar{top:16px;left:16px;right:16px;display:flex;gap:8px;align-items:center;padding:8px;z-index:20;flex-wrap:wrap}
-.brand{display:flex;align-items:center;gap:9px;padding:0 12px 0 6px;font-weight:600;font-size:14.5px;letter-spacing:-.2px}
-.brand svg{width:24px;height:24px;color:var(--accent)}
-.brand .lo{color:var(--dim)}
-.divv{width:1px;height:26px;background:var(--line);margin:0 2px}
-.field{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--line);border-radius:9px;height:38px;padding:0 11px}
-.field:focus-within{border-color:var(--line2)}
-.field .lab{color:var(--dim2);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600}
-.field input{width:74px;background:none;border:0;outline:0;color:var(--txt);font-size:13.5px;font-family:inherit}
-.field input::placeholder{color:var(--dim2)}
-.field input::-webkit-outer-spin-button,.field input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
-.btn{height:38px;padding:0 18px;border:1px solid transparent;border-radius:9px;font-size:13.5px;font-weight:600;
-  cursor:pointer;font-family:inherit;letter-spacing:.1px;display:inline-flex;align-items:center;gap:7px;
-  background:var(--accent);color:#1a140a;transition:filter .12s}
-.btn:hover{filter:brightness(1.07)}.btn:active{filter:brightness(.95)}
-.btn.ic{background:var(--bg);border-color:var(--line);color:var(--dim);padding:0 11px}
-.btn.ic:hover{color:var(--txt);border-color:var(--line2)}
-.btn.ic svg{width:17px;height:17px}
+/* ── MC widgets ── */
+.mcbtn{font-family:MC,monospace;font-size:16px;color:#fff;text-shadow:2px 2px #3e3e3e;cursor:pointer;
+  background:#6d6d6d;border:2px solid;border-color:#a6a6a6 #383838 #383838 #a6a6a6;outline:2px solid #000;
+  padding:6px 14px 8px;user-select:none}
+.mcbtn:hover{background:#7c81b8;border-color:#b6baE6 #43436e #43436e #b6bae6}
+.mcbtn:active{border-color:#383838 #a6a6a6 #a6a6a6 #383838}
+.mcfield{display:flex;align-items:center;gap:8px;background:#000;border:2px solid #a0a0a0;outline:2px solid #000;
+  padding:5px 9px 7px;height:38px}
+.mcfield:focus-within{border-color:#fff}
+.mcfield .lab{color:#aaa;font-size:14px;text-shadow:2px 2px #2a2a2a}
+.mcfield input{width:64px;background:none;border:0;outline:0;color:#fff;font-family:MC,monospace;font-size:16px}
+.mcfield input::-webkit-outer-spin-button,.mcfield input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+
+/* ── top bar ── */
+#bar{position:fixed;top:0;left:0;right:0;z-index:20;display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  padding:8px 14px;background:rgba(0,0,0,.62);border-bottom:2px solid #000}
+#bar .title{font-weight:bold;font-size:20px;padding-right:2px}
+#bar .sub{font-size:14px;margin-top:2px}
 .spacer{flex:1}
-.live{display:flex;align-items:center;gap:8px;padding:0 12px;font-size:13px}
-.live .sw{width:9px;height:9px;border-radius:50%;background:var(--bad);flex:0 0 9px;transition:background .3s}
-.live .sw.on{background:var(--good);box-shadow:0 0 8px rgba(121,200,160,.5)}
-.live b{font-weight:600}
-.live .dl{color:var(--dim2);font-size:12px}
+.online{display:flex;align-items:center;gap:9px;font-size:16px;padding:0 6px}
 
-/* players panel */
-#side{top:78px;right:16px;width:230px;max-height:calc(100vh - 104px);z-index:15;padding:4px;
-  display:flex;flex-direction:column;transition:transform .25s,opacity .25s}
-#side.hidden{transform:translateX(12px);opacity:0;pointer-events:none}
-.grp{padding:9px 8px 6px;overflow-y:auto}
-.grp::-webkit-scrollbar{width:7px}.grp::-webkit-scrollbar-track{background:transparent}
-.grp::-webkit-scrollbar-thumb{background:var(--line2);border-radius:7px}
-.grp h4{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--dim2);font-weight:700;
-  margin:0 4px 7px;display:flex;align-items:center;gap:7px}
-.grp h4::after{content:"";flex:1;height:1px;background:var(--line)}
-.grp h4 .n{color:var(--dim)}
-.it{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:8px;cursor:pointer;user-select:none;
-  font-size:13px;color:var(--dim);transition:background .1s,color .1s}
-.it:hover{background:var(--panel2);color:var(--txt)}
-.it.on{color:var(--txt);background:var(--panel2);box-shadow:inset 0 0 0 1px var(--accent-d)}
-.it .gi{width:24px;height:24px;flex:0 0 24px;border-radius:6px;overflow:hidden;background:var(--panel2);position:relative}
+/* MC connection bars */
+.bars{display:inline-flex;align-items:flex-end;gap:2px;height:20px;padding-bottom:2px}
+.bars i{width:4px;background:#3a3a3a;display:block}
+.bars i.on{background:#00e600}
+.bars.bad i.on{background:#e63c3c}
+
+/* ── player list (tab-list style) ── */
+#side{position:fixed;top:66px;right:12px;z-index:15;width:252px;max-height:calc(100vh - 150px);
+  background:rgba(0,0,0,.62);border:2px solid #000;padding:8px;display:flex;flex-direction:column}
+#side.hidden{display:none}
+#side h4{font-size:16px;font-weight:normal;text-align:center;padding:2px 0 8px;color:#fff;text-shadow:2px 2px #3e3e3e}
+#playerList{overflow-y:auto;display:flex;flex-direction:column;gap:2px}
+#playerList::-webkit-scrollbar{width:10px}
+#playerList::-webkit-scrollbar-track{background:#000}
+#playerList::-webkit-scrollbar-thumb{background:#6d6d6d;border:2px solid #000}
+.it{display:flex;align-items:center;gap:9px;padding:4px 7px;cursor:pointer;background:rgba(255,255,255,.10);border:2px solid transparent}
+.it:hover{background:rgba(255,255,255,.22)}
+.it.on{border-color:#fff;background:rgba(255,255,255,.16)}
+.it .gi{width:24px;height:24px;flex:0 0 24px;position:relative;overflow:hidden;background:#333;
+  box-shadow:0 0 0 2px rgba(0,0,0,.55)}
 .it .nm{flex:1;min-width:0}
-.it .nm .u{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
-.it .nm .s{font-size:10.5px;color:var(--dim2)}
-.it .pg{font-size:11px;color:var(--dim2);flex:none}
-.pempty{color:var(--dim2);font-size:12.5px;text-align:center;padding:18px 0 14px}
-.fnote{border-top:1px solid var(--line);margin-top:2px;padding:9px 12px;font-size:12px;color:var(--dim);display:none;align-items:center;gap:6px}
-.fnote.on{display:flex}
-.fnote b{color:var(--accent);font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.fnote .stop{color:var(--dim2);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
-.fnote .stop:hover{color:var(--txt)}
+.it .nm .u{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:2px 2px #3e3e3e}
+.it .nm .s{font-size:12px;color:#aaa;text-shadow:2px 2px #2a2a2a}
+.pempty{color:#aaa;font-size:14px;text-align:center;padding:14px 0;text-shadow:2px 2px #2a2a2a}
 
-/* bottom status */
-#stat{bottom:16px;left:16px;display:flex;align-items:stretch;height:40px;z-index:15;overflow:hidden}
-#stat .cell{display:flex;align-items:center;gap:7px;padding:0 14px;border-right:1px solid var(--line)}
-#stat .cell:last-child{border-right:0}
-#stat .k{color:var(--dim2);font-size:10px;text-transform:uppercase;letter-spacing:.8px;font-weight:600}
-#stat .v{font-size:13px;font-weight:500}
+/* ── F3-style coords, bottom left ── */
+#f3{position:fixed;left:8px;bottom:8px;z-index:15;font-size:15px;display:flex;flex-direction:column;gap:2px;pointer-events:none}
+#f3 div{background:rgba(80,80,80,.55);padding:1px 5px 3px;width:max-content;text-shadow:none}
 
-/* leaflet zoom → seedmap-style button column, bottom right */
-.leaflet-control-zoom{border:none!important;box-shadow:0 12px 40px -12px rgba(0,0,0,.7)!important;
-  border-radius:12px!important;overflow:hidden;border:1px solid var(--line)!important}
-.leaflet-control-zoom a{width:40px!important;height:40px!important;line-height:40px!important;
-  background:var(--panel)!important;color:var(--dim)!important;border:0!important;font-size:17px!important;font-weight:400!important}
-.leaflet-control-zoom a:first-child{border-bottom:1px solid var(--line)!important}
-.leaflet-control-zoom a:hover{background:var(--panel2)!important;color:var(--txt)!important}
-.leaflet-bottom.leaflet-right .leaflet-control{margin:0 16px 16px 0}
+/* ── actionbar follow note, bottom center ── */
+#followNote{position:fixed;bottom:74px;left:50%;transform:translateX(-50%);z-index:16;display:none;
+  font-size:16px;color:#ffff55;text-shadow:2px 2px #3e3e15;background:rgba(0,0,0,.35);padding:4px 12px 6px;cursor:pointer}
+#followNote.on{display:block}
 
-/* player heads — face + hat cropped straight from the skin PNG */
+/* ── zoom (MC buttons, bottom right) ── */
+.leaflet-control-zoom{border:none!important;box-shadow:none!important;display:flex;flex-direction:column;gap:6px}
+.leaflet-control-zoom a{width:40px!important;height:40px!important;line-height:36px!important;border-radius:0!important;
+  font-family:MC,monospace!important;font-size:20px!important;color:#fff!important;text-shadow:2px 2px #3e3e3e;
+  background:#6d6d6d!important;border:2px solid!important;border-color:#a6a6a6 #383838 #383838 #a6a6a6!important;
+  outline:2px solid #000}
+.leaflet-control-zoom a:hover{background:#7c81b8!important;border-color:#b6bae6 #43436e #43436e #b6bae6!important}
+.leaflet-bottom.leaflet-right .leaflet-control{margin:0 12px 12px 0}
+
+/* ── player heads / markers ── */
 .face,.hat{position:absolute;inset:0;background-repeat:no-repeat;image-rendering:pixelated}
 .gi .face{background-size:192px auto;background-position:-24px -24px}
 .gi .hat{background-size:192px auto;background-position:-120px -24px}
-
-/* map markers */
 .pmarker{position:relative}
-.pmarker .mhead{position:absolute;left:-15px;top:-15px;width:30px;height:30px;border-radius:7px;overflow:hidden;
-  background:var(--panel2);box-shadow:0 0 0 2px var(--panel),0 4px 14px -2px rgba(0,0,0,.8)}
-.pmarker .mhead .face{background-size:240px auto;background-position:-30px -30px}
-.pmarker .mhead .hat{background-size:240px auto;background-position:-150px -30px}
-.pmarker .mname{position:absolute;top:19px;left:50%;transform:translateX(-50%);white-space:nowrap;
-  font-size:11px;font-weight:600;color:var(--txt);background:var(--panel);border:1px solid var(--line);
-  padding:1px 7px;border-radius:6px;pointer-events:none;box-shadow:0 4px 12px -2px rgba(0,0,0,.6)}
-.pmarker.sel .mhead{box-shadow:0 0 0 2px var(--accent),0 4px 14px -2px rgba(0,0,0,.8)}
-.pmarker.sel .mname{border-color:var(--accent-d);color:var(--accent)}
-.pmarker .arrow{position:absolute;left:-6px;top:-29px;width:12px;height:12px;pointer-events:none;transform-origin:6px 29px}
+.pmarker .mhead{position:absolute;left:-14px;top:-14px;width:28px;height:28px;overflow:hidden;background:#333;
+  box-shadow:0 0 0 2px #000}
+.pmarker .mhead .face{background-size:224px auto;background-position:-28px -28px}
+.pmarker .mhead .hat{background-size:224px auto;background-position:-140px -28px}
+.pmarker .mname{position:absolute;top:18px;left:50%;transform:translateX(-50%);white-space:nowrap;
+  font-size:14px;color:#fff;background:rgba(0,0,0,.4);padding:1px 6px 3px;pointer-events:none;text-shadow:2px 2px #3e3e3e}
+.pmarker.sel .mhead{box-shadow:0 0 0 2px #fff}
+.pmarker.sel .mname{color:#ffff55;text-shadow:2px 2px #3e3e15}
+.pmarker .arrow{position:absolute;left:-6px;top:-27px;width:12px;height:12px;pointer-events:none;transform-origin:6px 27px;
+  filter:drop-shadow(1px 1px 0 #000)}
 .pmarker .arrow::before{content:"";position:absolute;left:2px;top:1px;border:4px solid transparent;
-  border-bottom:7px solid var(--accent);border-top:none}
+  border-bottom:7px solid #fff;border-top:none}
 #map .leaflet-marker-icon{transition:transform 2.4s linear}
 #map.nozoomanim .leaflet-marker-icon{transition:none}
 
-/* loading */
+/* ── dirt loading screen ── */
 #load{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:18px;background:var(--bg);transition:opacity .4s}
-#load .ring{width:38px;height:38px;border:2.5px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-#load .msg{color:var(--dim);font-size:13px;letter-spacing:.2px}
+  gap:14px;background:#000;transition:opacity .4s;image-rendering:pixelated}
+#load .msg{font-size:20px;color:#ddd;text-shadow:2px 2px #373737}
 
-@media(max-width:760px){
-  .field,.divv,#gobtn{display:none}
-  .brand .lo{display:none}
-  #side{width:200px}
+@media(max-width:820px){
+  .mcfield,#gobtn,#originbtn{display:none}
+  #bar .sub{display:none}
+  #side{width:212px}
 }
 </style>
 </head>
 <body>
 
 <div id=map></div>
-<div id=load><div class=ring></div><div class=msg>connecting to factionsvr</div></div>
+<div id=load><div class="msg" id=loadMsg>Loading terrain...</div></div>
 
-<div class="panel" id=bar>
-  <div class=brand>
-    <svg viewBox="0 0 24 24" fill=none stroke=currentColor stroke-width=1.6 stroke-linejoin=round stroke-linecap=round><path d="M6 21V4"/><path d="M6 4h12l-3 3.5L18 11H6"/></svg>
-    <span>Wolver<span class=lo>Factions</span></span>
+<div id=bar>
+  <div>
+    <div class="title sh">Wolver Factions</div>
+    <div class="sub gray">live map &middot; factionsvr.com</div>
   </div>
-  <div class=divv></div>
-  <div class=field><span class=lab>X</span><input id=gotoX type=number placeholder="0"></div>
-  <div class=field><span class=lab>Z</span><input id=gotoZ type=number placeholder="0"></div>
-  <button class=btn id=gobtn onclick=goToCoords()>Go</button>
-  <button class="btn ic" title="Back to origin" onclick=goToOrigin()>
-    <svg viewBox="0 0 24 24" fill=none stroke=currentColor stroke-width=1.6 stroke-linecap=round><circle cx=12 cy=12 r=7/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
-  </button>
-  <button class="btn ic" title="Refresh tiles" onclick=refreshTiles()>
-    <svg viewBox="0 0 24 24" fill=none stroke=currentColor stroke-width=1.6 stroke-linecap=round stroke-linejoin=round><path d="M20 11a8 8 0 1 0-2.3 6.3"/><path d="M20 4v7h-7"/></svg>
-  </button>
   <div class=spacer></div>
-  <div class=live><span class=sw id=statusDot></span><b id=onlineCount>–</b><span class=dl>online · factionsvr.com</span></div>
-  <button class="btn ic" title="Toggle player list" onclick=toggleSidebar()>
-    <svg viewBox="0 0 24 24" fill=none stroke=currentColor stroke-width=1.6 stroke-linecap=round><circle cx=9 cy=8 r=3.2/><path d="M3.5 19c.7-3 2.9-4.5 5.5-4.5s4.8 1.5 5.5 4.5"/><circle cx=17 cy=9 r=2.4/><path d="M16 14.7c2 .3 3.6 1.5 4.3 3.8"/></svg>
-  </button>
-</div>
-
-<div class="panel" id=side>
-  <div class=grp>
-    <h4>Players <span class=n id=playerCount></span></h4>
-    <div id=playerList><div class=pempty>loading…</div></div>
+  <div class=mcfield><span class=lab>X</span><input id=gotoX type=number placeholder=0></div>
+  <div class=mcfield><span class=lab>Z</span><input id=gotoZ type=number placeholder=0></div>
+  <button class=mcbtn id=gobtn onclick=goToCoords()>Go</button>
+  <button class=mcbtn id=originbtn onclick=goToOrigin()>0, 0</button>
+  <button class=mcbtn onclick=refreshTiles()>Reload</button>
+  <button class=mcbtn onclick=toggleSidebar()>List</button>
+  <div class=online>
+    <span class=bars id=connBars><i style=height:6px></i><i style=height:9px></i><i style=height:12px></i><i style=height:15px></i><i style=height:18px></i></span>
+    <span class=sh><b id=onlineCount>--</b> online</span>
   </div>
-  <div class=fnote id=followNote>following <b id=followName></b><span class=stop onclick=stopFollow()>stop</span></div>
 </div>
 
-<div class="panel" id=stat>
-  <div class=cell><span class=k>X</span><span class="v mono" id=statX>–</span></div>
-  <div class=cell><span class=k>Z</span><span class="v mono" id=statZ>–</span></div>
-  <div class=cell><span class=k>Chunk</span><span class="v mono" id=statC>–</span></div>
+<div id=side>
+  <h4 id=playerCount>Players</h4>
+  <div id=playerList><div class=pempty>Loading...</div></div>
 </div>
+
+<div id=f3 class=mono>
+  <div>Block: <span id=statXZ>-- --</span></div>
+  <div>Chunk: <span id=statC>-- --</span></div>
+</div>
+
+<div id=followNote onclick=stopFollow() title="Click to stop following">Following <span id=followName></span></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -180,8 +163,27 @@ const POLL_MS = 2500;
 const CHUNK_SIZE = 16, TILE_SIZE = 256, BASE_ZOOM = 8, MIN_ZOOM = 0, MAX_ZOOM = 11;
 const UPB = (TILE_SIZE / Math.pow(2, BASE_ZOOM)) / CHUNK_SIZE; // CRS units per block
 let cacheBuster = Date.now();
-
 const toLatLng = (x, z) => [-z * UPB, x * UPB];
+
+// ═══ Dirt loading screen (16x16 random browns, like the classic dirt screen) ═══
+(() => {
+  const c = document.createElement('canvas'); c.width = c.height = 16;
+  const g = c.getContext('2d');
+  const P = ['#5a3d26','#66452b','#704c30','#79553a','#5f4130','#6b4a33'];
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+    g.fillStyle = P[Math.floor(Math.random() * P.length)]; g.fillRect(x, y, 1, 1);
+  }
+  const el = document.getElementById('load');
+  el.style.background = `url(${c.toDataURL()})`;
+  el.style.backgroundSize = '64px 64px';
+  // darken like the real loading screen
+  el.style.boxShadow = 'inset 0 0 0 100vmax rgba(0,0,0,.55)';
+})();
+let loadDots = 0;
+const loadTick = setInterval(() => {
+  const m = document.getElementById('loadMsg');
+  if (m) m.textContent = 'Loading terrain' + '.'.repeat(1 + (loadDots++ % 3));
+}, 400);
 
 // ═══ Map ═══
 const map = L.map('map', {
@@ -189,6 +191,8 @@ const map = L.map('map', {
   minZoom: MIN_ZOOM, maxZoom: MAX_ZOOM, zoomControl: false, attributionControl: false
 });
 L.control.zoom({ position: 'bottomright' }).addTo(map);
+// recover if the container was 0-sized at init (hidden tab/embed) or gets resized
+new ResizeObserver(() => map.invalidateSize()).observe(document.getElementById('map'));
 
 L.TileLayer.ChunkLayer = L.TileLayer.extend({
   getTileUrl(coords) {
@@ -221,15 +225,15 @@ setTimeout(hideLoading, 6000); // safety net if a tile hangs
 function hideLoading() {
   const el = document.getElementById('load');
   if (!el || el.style.opacity === '0') return;
-  el.style.opacity = '0'; setTimeout(() => el.remove(), 450);
+  el.style.opacity = '0';
+  setTimeout(() => { el.remove(); clearInterval(loadTick); }, 450);
 }
 
-// ═══ Status bar / controls ═══
+// ═══ F3 coords / controls ═══
 map.on('mousemove', e => {
   const x = Math.floor(e.latlng.lng / UPB), z = -Math.ceil(e.latlng.lat / UPB);
-  document.getElementById('statX').textContent = x;
-  document.getElementById('statZ').textContent = z;
-  document.getElementById('statC').textContent = `${Math.floor(x/16)}, ${Math.floor(z/16)}`;
+  document.getElementById('statXZ').textContent = `${x} ${z}`;
+  document.getElementById('statC').textContent = `${Math.floor(x/16)} ${Math.floor(z/16)}`;
 });
 function goToCoords() {
   const x = parseInt(document.getElementById('gotoX').value) || 0;
@@ -238,7 +242,7 @@ function goToCoords() {
 }
 function goToOrigin() { map.setView(toLatLng(0, 0), BASE_ZOOM - 2); }
 function refreshTiles() { cacheBuster = Date.now(); tileLayer.redraw(); }
-document.querySelectorAll('.field input').forEach(i =>
+document.querySelectorAll('.mcfield input').forEach(i =>
   i.addEventListener('keydown', e => { if (e.key === 'Enter') goToCoords(); }));
 
 let sidebarOpen = true;
@@ -258,6 +262,14 @@ function headHtml(skinId) {
   return `<div class=face ${bg}></div><div class=hat ${bg}></div>`;
 }
 function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// MC tab-list connection bars: 5 green bars by ping
+function pingBars(ping) {
+  const lit = ping < 150 ? 5 : ping < 300 ? 4 : ping < 600 ? 3 : ping < 1000 ? 2 : 1;
+  let h = '';
+  for (let i = 0; i < 5; i++) h += `<i style="height:${6+i*3}px" class="${i < lit ? 'on' : ''}"></i>`;
+  return `<span class=bars title="${Math.round(ping)}ms">${h}</span>`;
+}
 
 function markerIcon(p, selected) {
   const heading = p.Pose?.Heading ?? 0;
@@ -323,8 +335,8 @@ let rosterKey = '';
 function renderList(players) {
   const list = document.getElementById('playerList');
   document.getElementById('onlineCount').textContent = players.length;
-  document.getElementById('playerCount').textContent = players.length || '';
-  if (!players.length) { list.innerHTML = '<div class=pempty>no players online</div>'; rosterKey = ''; return; }
+  document.getElementById('playerCount').textContent = players.length ? `Players — ${players.length}` : 'Players';
+  if (!players.length) { list.innerHTML = '<div class=pempty>No players online</div>'; rosterKey = ''; return; }
   const sorted = [...players].sort((a, b) => (a.Username || '').localeCompare(b.Username || ''));
   const key = sorted.map(p => `${p.id}:${p.SkinId}`).join(',');
   if (key !== rosterKey) {
@@ -332,8 +344,8 @@ function renderList(players) {
     list.innerHTML = sorted.map(p => `
       <div class=it data-id="${p.id}">
         <span class=gi>${headHtml(p.SkinId)}</span>
-        <span class=nm><div class=u>${escapeHtml(p.Username || '?')}</div><div class="s mono"></div></span>
-        <span class="pg mono"></span>
+        <span class=nm><div class=u>${escapeHtml(p.Username || '?')}</div><div class=s></div></span>
+        <span class=pgslot></span>
       </div>`).join('');
     list.querySelectorAll('.it').forEach(el => el.addEventListener('click', () => {
       const id = Number(el.dataset.id);
@@ -349,7 +361,7 @@ function renderList(players) {
     const p = sorted.find(q => q.id === Number(el.dataset.id));
     if (!p) continue;
     el.querySelector('.s').textContent = p.PlayTime || '';
-    el.querySelector('.pg').textContent = `${Math.round(p.ping || 0)}ms`;
+    el.querySelector('.pgslot').innerHTML = pingBars(p.ping || 0);
   }
   syncSel();
 }
@@ -363,11 +375,15 @@ async function poll() {
     const r = await fetch(PLAYERS_API, { cache: 'no-store' });
     const d = await r.json();
     lastPlayers = d.players || [];
-    document.getElementById('statusDot').classList.add('on');
+    document.getElementById('connBars').classList.remove('bad');
+    document.getElementById('connBars').querySelectorAll('i').forEach(b => b.classList.add('on'));
     updateMarkers(lastPlayers);
     renderList(lastPlayers);
   } catch (e) {
-    document.getElementById('statusDot').classList.remove('on');
+    const cb = document.getElementById('connBars');
+    cb.classList.add('bad');
+    cb.querySelectorAll('i').forEach((b, i) => b.classList.toggle('on', i === 0));
+    document.getElementById('onlineCount').textContent = '--';
   } finally {
     setTimeout(poll, POLL_MS);
   }
