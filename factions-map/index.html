@@ -269,7 +269,10 @@ const PLAYERS_API = 'https://admin.wolver002.com/factions/api/players'; // our C
 const POLL_MS = 1000; // matches the official map's refresh rate
 
 // Tile scheme (mirrors the official map exactly so tiles line up)
-const CHUNK_SIZE = 16, TILE_SIZE = 256, BASE_ZOOM = 8, MIN_ZOOM = 0, MAX_ZOOM = 11;
+// BASE_ZOOM is shifted high so the map can zoom out to Leaflet zoom 0 (never negative —
+// negative Leaflet zoom breaks tile rendering). MIN_NATIVE is the zoom of the most
+// zoomed-out real tiles (tile-zoom -8); below it Leaflet scales those tiles down.
+const CHUNK_SIZE = 16, TILE_SIZE = 256, BASE_ZOOM = 12, MIN_ZOOM = 2, MIN_NATIVE = 4, MAX_ZOOM = 15;
 const UPB = (TILE_SIZE / Math.pow(2, BASE_ZOOM)) / CHUNK_SIZE; // CRS units per block
 let cacheBuster = Date.now();
 const toLatLng = (x, z) => [-z * UPB, x * UPB];
@@ -323,7 +326,7 @@ L.TileLayer.ChunkLayer = L.TileLayer.extend({
 const tileLayer = new L.TileLayer.ChunkLayer('', {
   tileSize: TILE_SIZE, noWrap: true, keepBuffer: 8,
   updateWhenZooming: false, updateWhenIdle: false,
-  bounds: [[-1e9,-1e9],[1e9,1e9]], maxNativeZoom: BASE_ZOOM, minNativeZoom: MIN_ZOOM,
+  bounds: [[-1e9,-1e9],[1e9,1e9]], maxNativeZoom: BASE_ZOOM, minNativeZoom: MIN_NATIVE,
   errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
 }).addTo(map);
 
