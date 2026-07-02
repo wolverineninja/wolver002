@@ -505,7 +505,7 @@ async function refreshHeat() {
   const pts = (d.cells || []).map(([x, z, w]) => { const ll = toLatLng(x, z); return [ll[0], ll[1], w / max]; });
   if (!heatLayer) {
     heatLayer = L.heatLayer(pts, {
-      radius: 22, blur: 24, minOpacity: 0.3, maxZoom: BASE_ZOOM - 1,
+      radius: 22, blur: 24, minOpacity: 0.12, maxZoom: BASE_ZOOM - 1,
       gradient: { 0.2: '#2b45ff', 0.4: '#00cfcf', 0.6: '#37d837', 0.8: '#ffd23b', 1.0: '#ff3b2f' }
     }).addTo(map);
   } else heatLayer.setLatLngs(pts);
