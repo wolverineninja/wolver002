@@ -134,6 +134,24 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 .dbit .s{font-size:11px;color:#aaa;text-shadow:1px 1px #2a2a2a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dbconf{font-size:13px;color:#ffd98a;text-shadow:1px 1px #4a3410;flex:none}
 
+/* ── "seen here" popup (heatmap click) ── */
+#atPopup{position:fixed;z-index:30;display:none;width:236px;max-height:300px;flex-direction:column;
+  background:rgba(0,0,0,.82);border:2px solid #000;box-shadow:0 0 0 2px #4a4a4a;padding:8px}
+#atPopup.open{display:flex}
+#atPopup .at-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+#atPopup .at-head span:first-child{flex:1;font-size:13px;color:#ffd98a;text-shadow:1px 1px #4a3410}
+#atPopup .stop{cursor:pointer;color:#aaa;padding:0 4px}
+#atPopup .stop:hover{color:#fff}
+#atList{overflow-y:auto;display:flex;flex-direction:column;gap:2px}
+#atList::-webkit-scrollbar{width:10px}
+#atList::-webkit-scrollbar-track{background:#000}
+#atList::-webkit-scrollbar-thumb{background:#6d6d6d;border:2px solid #000}
+.atit{display:flex;align-items:center;gap:8px;padding:4px 6px;background:rgba(255,255,255,.07)}
+.atit .nm{flex:1;min-width:0}
+.atit .u{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:2px 2px #3e3e3e}
+.atit .s{font-size:10px;color:#9a9a9a;text-shadow:1px 1px #1a1a1a}
+.atit .ago{font-size:10px;color:#9a9a9a;text-shadow:1px 1px #1a1a1a;flex:none}
+
 /* ── credits ── */
 #creditsBtn{font-family:MC,monospace;font-size:11px;color:#9a9a9a;text-shadow:1px 1px #000;
   background:none;border:0;padding:0;margin-top:1px;cursor:pointer;display:block}
@@ -207,6 +225,11 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
   <div class=dbnote>Still collecting &amp; analyzing data &mdash; it will likely take 1 week+ of tracking to get accurate base coordinates.</div>
   <input id=dbSearch placeholder="Search player..." oninput=renderDbList() autocomplete=off spellcheck=false>
   <div id=dbList><div class=pempty>Open to load...</div></div>
+</div>
+
+<div id=atPopup>
+  <div class=at-head><span id=atTitle></span><span class=stop onclick=closeAt()>x</span></div>
+  <div id=atList></div>
 </div>
 
 <div id=creditsModal onclick="if(event.target===this)toggleCredits()">
@@ -488,8 +511,39 @@ async function refreshHeat() {
   } else heatLayer.setLatLngs(pts);
 }
 function startHeatmap() { refreshHeat(); clearInterval(heatTimer); heatTimer = setInterval(refreshHeat, 60000); }
-function stopHeatmap() { clearInterval(heatTimer); heatTimer = null; if (heatLayer) { map.removeLayer(heatLayer); heatLayer = null; } }
+function stopHeatmap() { clearInterval(heatTimer); heatTimer = null; if (heatLayer) { map.removeLayer(heatLayer); heatLayer = null; } closeAt(); }
 if (ext.heat) startHeatmap();
+
+// click a heated area (heatmap on) to see who's been there
+const AT_API = 'https://admin.wolver002.com/factions/api/at';
+const fmtAgo = s => s < 60 ? s + 's ago' : s < 3600 ? Math.round(s / 60) + 'm ago' : s < 86400 ? Math.round(s / 3600) + 'h ago' : Math.round(s / 86400) + 'd ago';
+function closeAt() { document.getElementById('atPopup').classList.remove('open'); }
+
+map.on('click', async e => {
+  if (!ext.heat) return;
+  const x = Math.round(e.latlng.lng / UPB), z = Math.round(-e.latlng.lat / UPB);
+  const panel = document.getElementById('atPopup');
+  document.getElementById('atTitle').textContent = 'Loading...';
+  document.getElementById('atList').innerHTML = '';
+  panel.classList.add('open');
+  const pt = map.latLngToContainerPoint(e.latlng);
+  panel.style.left = Math.max(8, Math.min(pt.x + 12, window.innerWidth - 244)) + 'px';
+  panel.style.top = Math.max(60, Math.min(pt.y, window.innerHeight - 312)) + 'px';
+  let d;
+  try { d = await (await fetch(`${AT_API}?x=${x}&z=${z}&r=40`, { cache: 'no-store' })).json(); }
+  catch (_) { document.getElementById('atTitle').textContent = 'Connection error'; return; }
+  const players = d.players || [];
+  document.getElementById('atTitle').textContent =
+    players.length ? `${players.length} player${players.length === 1 ? '' : 's'} seen here` : 'No one tracked here';
+  document.getElementById('atList').innerHTML = players.map(p => `
+    <div class=atit>
+      <div class=nm>
+        <div class=u style="${adminStyle(p.username, 2)}">${escapeHtml(p.username)}</div>
+        <div class=s>${p.x}, ${p.y}, ${p.z}</div>
+      </div>
+      <div class=ago>${fmtAgo(p.ago)}</div>
+    </div>`).join('');
+});
 
 // ═══ 2atabase (base finder) ═══
 const BASES_API = 'https://admin.wolver002.com/factions/api/bases';
