@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Wolver Factions Map — live map for FactionsVR">
+<title>Wolver Factions Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+:root{
+  --bg:#141414; --panel:#1c1c1e; --panel2:#232326; --line:#2e2e33;
+  --text:#e8e4dc; --dim:#9a958b; --accent:#c79a55; --accent2:#e0b878;
+  --good:#7dc37d; --bad:#d07070;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,'Segoe UI',sans-serif;overflow:hidden}
+
+/* ── Top bar ── */
+.topbar{position:fixed;top:0;left:0;right:0;height:52px;z-index:1100;display:flex;align-items:center;gap:14px;
+  padding:0 16px;background:rgba(20,20,20,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.brand{font-weight:700;font-size:17px;letter-spacing:.4px;color:var(--accent);text-decoration:none;white-space:nowrap}
+.brand small{color:var(--dim);font-weight:400;margin-left:8px;letter-spacing:0}
+.spacer{flex:1}
+.pill{display:flex;align-items:center;gap:7px;background:var(--panel);border:1px solid var(--line);
+  border-radius:20px;padding:5px 13px;font-size:13px;color:var(--dim);white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--bad);transition:background .3s}
+.dot.on{background:var(--good)}
+.pill b{color:var(--text)}
+
+/* ── Map ── */
+#map{position:fixed;top:52px;left:0;right:0;bottom:0;background:#181820;cursor:crosshair}
+#map.with-sidebar{right:260px}
+.leaflet-container{background:#181820}
+.leaflet-control-zoom{border:none!important;margin-top:14px!important;margin-left:14px!important}
+.leaflet-control-zoom a{width:36px!important;height:36px!important;line-height:36px!important;font-size:18px!important;
+  background:rgba(28,28,30,.92)!important;color:var(--text)!important;border:1px solid var(--line)!important}
+.leaflet-control-zoom a:hover{background:var(--panel2)!important;color:var(--accent)!important}
+
+/* ── Coords ── */
+.coords{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:1000;pointer-events:none;
+  background:rgba(28,28,30,.92);border:1px solid var(--line);border-radius:8px;padding:8px 16px;
+  font-family:ui-monospace,Consolas,monospace;font-size:13px;color:var(--dim)}
+.coords b{color:var(--text);font-weight:600}
+
+/* ── Controls ── */
+.controls{position:fixed;top:66px;right:14px;z-index:1000;background:rgba(28,28,30,.94);border:1px solid var(--line);
+  border-radius:10px;padding:12px;width:196px;transition:right .3s}
+.controls.with-sidebar{right:274px}
+.controls h6{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--dim);margin-bottom:9px}
+.goto{display:flex;gap:6px}
+.goto input{width:62px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--text);
+  padding:6px 8px;font-size:13px;font-family:ui-monospace,Consolas,monospace}
+.goto input:focus{outline:none;border-color:var(--accent)}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--text);padding:6px 10px;
+  font-size:12px;cursor:pointer;transition:all .15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn-row{display:flex;gap:6px;margin-top:8px}
+.btn-row .btn{flex:1}
+
+/* ── Sidebar ── */
+.sidebar{position:fixed;top:52px;right:0;bottom:0;width:260px;z-index:1050;background:rgba(24,24,26,.96);
+  border-left:1px solid var(--line);display:flex;flex-direction:column;transition:transform .3s}
+.sidebar.hidden{transform:translateX(260px)}
+.sidebar-head{padding:14px 16px 10px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;gap:8px}
+.sidebar-head h5{font-size:14px;font-weight:600}
+.sidebar-head span{font-size:12px;color:var(--dim)}
+.plist{flex:1;overflow-y:auto;padding:8px}
+.plist::-webkit-scrollbar{width:8px}
+.plist::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+.pitem{display:flex;align-items:center;gap:10px;padding:7px 9px;border-radius:8px;cursor:pointer;border:1px solid transparent}
+.pitem:hover{background:var(--panel2)}
+.pitem.sel{background:var(--panel2);border-color:var(--accent)}
+.pitem .meta{flex:1;min-width:0}
+.pitem .name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pitem .sub{font-size:11px;color:var(--dim);font-family:ui-monospace,Consolas,monospace}
+.pempty{color:var(--dim);font-size:13px;text-align:center;padding:24px 0}
+.sidebar-toggle{position:fixed;top:66px;z-index:1060;right:274px;transition:right .3s;width:26px;height:44px;
+  background:rgba(28,28,30,.94);border:1px solid var(--line);border-radius:8px 0 0 8px;color:var(--dim);
+  cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center}
+.sidebar-toggle.closed{right:0}
+.sidebar-toggle:hover{color:var(--accent)}
+.follow-note{padding:8px 16px;border-top:1px solid var(--line);font-size:11px;color:var(--dim);display:none}
+.follow-note.on{display:block}
+.follow-note b{color:var(--accent)}
+
+/* ── Player heads (CSS-cropped from full skin — avoids canvas CORS taint) ── */
+.head{position:relative;width:28px;height:28px;flex:none;border-radius:5px;overflow:hidden;
+  background:#333;image-rendering:pixelated;box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+.head .face,.head .hat{position:absolute;inset:0;background-repeat:no-repeat;image-rendering:pixelated}
+/* face at (8,8) 8x8 in a 64-wide skin: size = 8*W, offset = -1*W */
+.head .face{background-size:224px auto;background-position:-28px -28px}
+.head .hat{background-size:224px auto;background-position:-140px -28px}
+
+/* ── Map markers ── */
+.pmarker{position:relative}
+.pmarker .mhead{position:absolute;left:-16px;top:-16px;width:32px;height:32px;border-radius:6px;overflow:hidden;
+  background:#333;box-shadow:0 0 0 2px rgba(20,20,20,.85),0 2px 8px rgba(0,0,0,.6);image-rendering:pixelated}
+.pmarker .mhead .face,.pmarker .mhead .hat{position:absolute;inset:0;background-repeat:no-repeat;image-rendering:pixelated}
+.pmarker .mhead .face{background-size:256px auto;background-position:-32px -32px}
+.pmarker .mhead .hat{background-size:256px auto;background-position:-160px -32px}
+.pmarker .mname{position:absolute;top:20px;left:50%;transform:translateX(-50%);white-space:nowrap;
+  font-size:11px;font-weight:600;color:#fff;background:rgba(20,20,20,.85);border:1px solid var(--line);
+  padding:1px 7px;border-radius:5px;pointer-events:none}
+.pmarker.sel .mhead{box-shadow:0 0 0 2px var(--accent),0 2px 8px rgba(0,0,0,.6)}
+.pmarker .arrow{position:absolute;left:-6px;top:-30px;width:12px;height:12px;pointer-events:none;
+  transform-origin:6px 30px}
+.pmarker .arrow::before{content:'';position:absolute;left:2px;top:2px;border:4px solid transparent;
+  border-bottom:7px solid var(--accent2);border-top:none}
+
+/* ── Loading ── */
+#loading{position:fixed;inset:0;z-index:2000;background:var(--bg);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:16px;transition:opacity .4s}
+.spin{width:42px;height:42px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;
+  animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#loading p{color:var(--dim);font-size:14px}
+
+/* markers glide between poll updates; suspended during zoom so Leaflet can reposition instantly */
+#map .leaflet-marker-icon{transition:transform 2.4s linear}
+#map.nozoomanim .leaflet-marker-icon{transition:none}
+
+@media(max-width:700px){
+  #map.with-sidebar{right:0}
+  .sidebar{width:230px}
+  .controls{display:none}
+  .brand small{display:none}
+}
+</style>
+</head>
+<body>
+
+<div id="loading"><div class="spin"></div><p>Loading Wolver Factions Map…</p></div>
+
+<nav class="topbar">
+  <a class="brand" href="/">Wolver <span style="color:var(--text)">Factions Map</span><small>live · factionsvr.com</small></a>
+  <div class="spacer"></div>
+  <div class="pill"><span class="dot" id="statusDot"></span><b id="onlineCount">–</b>&nbsp;online</div>
+</nav>
+
+<div id="map" class="with-sidebar"></div>
+
+<div class="coords" id="coords">X: <b>0</b>, Z: <b>0</b> &nbsp;|&nbsp; Chunk: 0, 0</div>
+
+<div class="controls with-sidebar" id="controls">
+  <h6>Go to coords</h6>
+  <div class="goto">
+    <input id="gotoX" type="number" placeholder="X">
+    <input id="gotoZ" type="number" placeholder="Z">
+    <button class="btn" onclick="goToCoords()">Go</button>
+  </div>
+  <div class="btn-row">
+    <button class="btn" onclick="goToOrigin()">Origin</button>
+    <button class="btn" onclick="refreshTiles()">↻ Tiles</button>
+  </div>
+</div>
+
+<div class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()">❯</div>
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-head"><h5>Players</h5><span id="playerCount">0 online</span></div>
+  <ul class="plist" id="playerList" style="list-style:none"><li class="pempty">Loading…</li></ul>
+  <div class="follow-note" id="followNote">Following <b id="followName"></b> — click them again to stop</div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ═══ Config ═══
+const FVR = 'https://factionsvr.com';                                  // tiles + skins (plain <img>, no CORS needed)
+const PLAYERS_API = 'https://admin.wolver002.com/factions/api/players'; // our CORS proxy on the wolver server
+const POLL_MS = 2500;
+
+// Tile scheme (mirrors the official map exactly so tiles line up)
+const CHUNK_SIZE = 16, TILE_SIZE = 256, BASE_ZOOM = 8, MIN_ZOOM = 0, MAX_ZOOM = 11;
+const UPB = (TILE_SIZE / Math.pow(2, BASE_ZOOM)) / CHUNK_SIZE; // CRS units per block
+let cacheBuster = Date.now();
+
+const toLatLng = (x, z) => [-z * UPB, x * UPB];
+
+// ═══ Map ═══
+const map = L.map('map', {
+  crs: L.CRS.Simple, center: toLatLng(175.5, 414.5), zoom: BASE_ZOOM - 4,
+  minZoom: MIN_ZOOM, maxZoom: MAX_ZOOM, zoomControl: true, attributionControl: false
+});
+
+L.TileLayer.ChunkLayer = L.TileLayer.extend({
+  getTileUrl(coords) {
+    const tz = coords.z - BASE_ZOOM;
+    if (tz >= 0) {
+      const s = Math.pow(2, tz);
+      return `${FVR}/api/map/chunk/0/${Math.floor(coords.x/s)}/${Math.floor(coords.y/s)}?t=${cacheBuster}`;
+    }
+    return `${FVR}/api/map/chunk/${tz}/${coords.x}/${coords.y}?t=${cacheBuster}`;
+  },
+  createTile(coords, done) {
+    const tile = document.createElement('img');
+    tile.alt = ''; tile.style.imageRendering = 'pixelated';
+    tile.onload = () => done(null, tile);
+    tile.onerror = () => { tile.style.visibility = 'hidden'; done(null, tile); };
+    tile.src = this.getTileUrl(coords);
+    return tile;
+  }
+});
+const tileLayer = new L.TileLayer.ChunkLayer('', {
+  tileSize: TILE_SIZE, noWrap: true, keepBuffer: 8,
+  updateWhenZooming: false, updateWhenIdle: false,
+  bounds: [[-1e9,-1e9],[1e9,1e9]], maxNativeZoom: BASE_ZOOM, minNativeZoom: MIN_ZOOM,
+  errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
+}).addTo(map);
+
+tileLayer.once('load', hideLoading);
+setTimeout(hideLoading, 6000); // safety net if a tile hangs
+
+// ═══ Coords display / controls ═══
+map.on('mousemove', e => {
+  const x = Math.floor(e.latlng.lng / UPB), z = -Math.ceil(e.latlng.lat / UPB);
+  document.getElementById('coords').innerHTML =
+    `X: <b>${x}</b>, Z: <b>${z}</b> &nbsp;|&nbsp; Chunk: ${Math.floor(x/16)}, ${Math.floor(z/16)}`;
+});
+function goToCoords() {
+  const x = parseInt(document.getElementById('gotoX').value) || 0;
+  const z = parseInt(document.getElementById('gotoZ').value) || 0;
+  map.setView(toLatLng(x, z), Math.max(map.getZoom(), BASE_ZOOM - 2));
+}
+function goToOrigin() { map.setView(toLatLng(0, 0), BASE_ZOOM - 2); }
+function refreshTiles() { cacheBuster = Date.now(); tileLayer.redraw(); }
+document.querySelectorAll('.goto input').forEach(i =>
+  i.addEventListener('keydown', e => { if (e.key === 'Enter') goToCoords(); }));
+
+function hideLoading() {
+  const el = document.getElementById('loading');
+  if (!el || el.style.opacity === '0') return;
+  el.style.opacity = '0'; setTimeout(() => el.remove(), 450);
+}
+
+// ═══ Sidebar ═══
+let sidebarOpen = true;
+function toggleSidebar() {
+  sidebarOpen = !sidebarOpen;
+  document.getElementById('sidebar').classList.toggle('hidden', !sidebarOpen);
+  document.getElementById('map').classList.toggle('with-sidebar', sidebarOpen);
+  document.getElementById('controls').classList.toggle('with-sidebar', sidebarOpen);
+  const t = document.getElementById('sidebarToggle');
+  t.classList.toggle('closed', !sidebarOpen);
+  t.textContent = sidebarOpen ? '❯' : '❮';
+  setTimeout(() => map.invalidateSize(), 320);
+}
+
+// ═══ Players ═══
+const markers = new Map();   // id -> {marker, el}
+let followId = null;
+
+const skinUrl = id => `${FVR}/api/game/skin/image/${id}`;
+function headHtml(skinId, cls) {
+  const bg = skinId ? `style="background-image:url('${skinUrl(skinId)}')"` : '';
+  return `<div class="${cls}"><div class="face" ${bg}></div><div class="hat" ${bg}></div></div>`;
+}
+
+function markerIcon(p, selected) {
+  const heading = p.Pose?.Heading ?? 0;
+  return L.divIcon({
+    className: '', iconSize: [0, 0],
+    html: `<div class="pmarker${selected ? ' sel' : ''}">
+      <div class="arrow" style="transform:rotate(${-heading}deg)"></div>
+      ${headHtml(p.SkinId, 'mhead')}
+      <div class="mname">${escapeHtml(p.Username || '?')}</div>
+    </div>`
+  });
+}
+
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function setFollow(id, name) {
+  followId = (followId === id) ? null : id;
+  const note = document.getElementById('followNote');
+  note.classList.toggle('on', !!followId);
+  if (followId) document.getElementById('followName').textContent = name;
+}
+
+function updateMarkers(players) {
+  const seen = new Set();
+  for (const p of players) {
+    const pos = p.Pose?.Head?.Position;
+    if (!pos) continue;
+    seen.add(p.id);
+    const ll = toLatLng(pos[0], pos[2]);
+    let e = markers.get(p.id);
+    if (!e) {
+      const m = L.marker(ll, { icon: markerIcon(p, followId === p.id) }).addTo(map);
+      m.on('click', () => { setFollow(p.id, p.Username); syncSel(); });
+      e = { marker: m, skin: p.SkinId };
+      markers.set(p.id, e);
+    } else {
+      // update in place — recreating the icon every poll causes flicker and kills the glide transition
+      e.marker.setLatLng(ll);
+      const root = e.marker.getElement()?.querySelector('.pmarker');
+      if (root) {
+        root.querySelector('.arrow').style.transform = `rotate(${-(p.Pose?.Heading ?? 0)}deg)`;
+        root.classList.toggle('sel', followId === p.id);
+        if (e.skin !== p.SkinId) {
+          e.skin = p.SkinId;
+          root.querySelectorAll('.face,.hat').forEach(d => d.style.backgroundImage = `url('${skinUrl(p.SkinId)}')`);
+        }
+      }
+    }
+    if (followId === p.id) map.panTo(ll, { animate: true, duration: 0.4 });
+  }
+  for (const [id, m] of markers) {
+    if (!seen.has(id)) { map.removeLayer(m.marker); markers.delete(id); if (followId === id) setFollow(id); }
+  }
+}
+
+let rosterKey = '';
+function renderList(players) {
+  const list = document.getElementById('playerList');
+  document.getElementById('onlineCount').textContent = players.length;
+  document.getElementById('playerCount').textContent = `${players.length} online`;
+  if (!players.length) { list.innerHTML = '<li class="pempty">No players online</li>'; rosterKey = ''; return; }
+  const sorted = [...players].sort((a, b) => (a.Username || '').localeCompare(b.Username || ''));
+  const key = sorted.map(p => `${p.id}:${p.SkinId}`).join(',');
+  if (key !== rosterKey) {
+    rosterKey = key;
+    list.innerHTML = sorted.map(p => `
+      <li class="pitem" data-id="${p.id}">
+        ${headHtml(p.SkinId, 'head')}
+        <div class="meta">
+          <div class="name">${escapeHtml(p.Username || '?')}</div>
+          <div class="sub"></div>
+        </div>
+      </li>`).join('');
+    list.querySelectorAll('.pitem').forEach(el => el.addEventListener('click', () => {
+      const id = Number(el.dataset.id);
+      const p = lastPlayers.find(q => q.id === id);
+      if (!p) return;
+      setFollow(id, p.Username);
+      const pos = p.Pose?.Head?.Position;
+      if (pos && followId === id) map.setView(toLatLng(pos[0], pos[2]), Math.max(map.getZoom(), BASE_ZOOM - 1));
+      syncSel();
+    }));
+  }
+  // per-poll updates happen in place so the list doesn't flicker or lose scroll position
+  for (const el of list.querySelectorAll('.pitem')) {
+    const p = sorted.find(q => q.id === Number(el.dataset.id));
+    if (p) el.querySelector('.sub').textContent = `${p.PlayTime || ''} · ${Math.round(p.ping || 0)}ms`;
+  }
+  syncSel();
+}
+
+function syncSel() {
+  document.querySelectorAll('.pitem').forEach(el =>
+    el.classList.toggle('sel', followId === Number(el.dataset.id)));
+  for (const [id, e] of markers)
+    e.marker.getElement()?.querySelector('.pmarker')?.classList.toggle('sel', followId === id);
+}
+
+// suspend the marker glide transition while zooming so Leaflet can reposition icons instantly
+map.on('zoomstart', () => document.getElementById('map').classList.add('nozoomanim'));
+map.on('zoomend', () => setTimeout(() => document.getElementById('map').classList.remove('nozoomanim'), 60));
+
+let lastPlayers = [];
+async function poll() {
+  try {
+    const r = await fetch(PLAYERS_API, { cache: 'no-store' });
+    const d = await r.json();
+    const players = d.players || [];
+    lastPlayers = players;
+    document.getElementById('statusDot').classList.add('on');
+    updateMarkers(players);
+    renderList(players);
+  } catch (e) {
+    document.getElementById('statusDot').classList.remove('on');
+    document.getElementById('playerCount').textContent = 'connection lost';
+  } finally {
+    setTimeout(poll, POLL_MS);
+  }
+}
+poll();
+</script>
+</body>
+</html>
