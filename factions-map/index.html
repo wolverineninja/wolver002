@@ -135,10 +135,9 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 .dbconf{font-size:13px;color:#ffd98a;text-shadow:1px 1px #4a3410;flex:none}
 
 /* ── credits ── */
-#creditsBtn{position:fixed;right:12px;bottom:12px;z-index:26;font-family:MC,monospace;font-size:12px;
-  color:#9a9a9a;text-shadow:1px 1px #000;background:rgba(0,0,0,.5);border:2px solid #000;
-  padding:3px 9px 5px;cursor:pointer}
-#creditsBtn:hover{color:#fff}
+#creditsBtn{font-family:MC,monospace;font-size:11px;color:#9a9a9a;text-shadow:1px 1px #000;
+  background:none;border:0;padding:0;margin-top:1px;cursor:pointer;display:block}
+#creditsBtn:hover{color:#fff;text-decoration:underline}
 #creditsModal{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.6)}
 #creditsModal.open{display:flex}
 #creditsModal .cbox{width:min(92vw,390px);background:rgba(12,12,12,.97);border:2px solid #000;
@@ -170,6 +169,7 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 <div id=bar>
   <div>
     <div class="title sh">WFM</div>
+    <button id=creditsBtn onclick=toggleCredits()>Credits</button>
   </div>
   <div class=spacer></div>
   <div class=mcfield><span class=lab>X</span><input id=gotoX type=number placeholder=0></div>
@@ -209,7 +209,6 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
   <div id=dbList><div class=pempty>Open to load...</div></div>
 </div>
 
-<button id=creditsBtn onclick=toggleCredits()>Credits</button>
 <div id=creditsModal onclick="if(event.target===this)toggleCredits()">
   <div class=cbox>
     <h4>Credits</h4>
