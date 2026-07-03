@@ -14,6 +14,7 @@
       --line: #1f1f23;
       --accent: #e8e8ea;
       --card: #111114;
+      --green: #4ade80;
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; }
@@ -155,6 +156,45 @@
       font-size: 12px;
     }
 
+    /* universal account login (shared with the remote console via localStorage) */
+    .auth-btn {
+      position: fixed; top: 16px; right: 16px; z-index: 50;
+      padding: 7px 15px; background: var(--card); border: 1px solid var(--line);
+      border-radius: 999px; color: var(--fg); font-family: inherit; font-size: 13px;
+      cursor: pointer; transition: border-color 160ms ease, color 160ms ease;
+    }
+    .auth-btn:hover { border-color: #2a2a30; }
+    .auth-btn .uname { color: var(--green); font-weight: 600; }
+    .auth-modal {
+      position: fixed; inset: 0; z-index: 60; display: none;
+      align-items: center; justify-content: center; background: rgba(0,0,0,0.6);
+    }
+    .auth-modal.show { display: flex; }
+    .auth-box {
+      width: min(90vw, 340px); background: var(--card); border: 1px solid var(--line);
+      border-radius: 14px; padding: 22px;
+    }
+    .auth-box h2 {
+      font-size: 18px; margin: 0 0 18px; font-weight: 600; color: var(--fg);
+      text-transform: none; letter-spacing: normal;
+    }
+    .auth-box input {
+      width: 100%; padding: 10px 12px; margin-bottom: 10px; background: #0d0d10;
+      border: 1px solid var(--line); border-radius: 8px; color: var(--fg);
+      font-family: inherit; font-size: 14px; outline: none;
+    }
+    .auth-box input:focus { border-color: #333; }
+    .auth-btns { display: flex; gap: 8px; margin-top: 8px; }
+    .auth-btns button {
+      flex: 1; padding: 10px; border: none; border-radius: 8px; font-family: inherit;
+      font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 160ms ease, background 160ms ease;
+    }
+    .auth-btns .btn-su { background: #222; color: var(--fg); }
+    .auth-btns .btn-su:hover { background: #2a2a2a; }
+    .auth-btns .btn-li { background: var(--green); color: #04120a; }
+    .auth-btns .btn-li:hover { opacity: 0.85; }
+    .auth-err { color: #ff6b6b; font-size: 12px; margin-top: 10px; min-height: 16px; }
+
     @media (min-width: 768px) {
       main {
         padding: 7vh 6vw 6vh;
@@ -191,6 +231,19 @@
   </style>
 </head>
 <body>
+  <button class="auth-btn" id="auth-btn" onclick="openAuth()">Log In</button>
+  <div class="auth-modal" id="auth-modal">
+    <div class="auth-box">
+      <h2>Account</h2>
+      <input type="text" id="auth-user" placeholder="Username" autocomplete="off" />
+      <input type="password" id="auth-pass" placeholder="Password" autocomplete="off" />
+      <div class="auth-btns">
+        <button class="btn-su" onclick="doSignup()">Sign Up</button>
+        <button class="btn-li" onclick="doLogin()">Log In</button>
+      </div>
+      <div class="auth-err" id="auth-err"></div>
+    </div>
+  </div>
   <main>
     <header>
       <h1>Shout Out Ball Zach</h1>
@@ -215,5 +268,78 @@
 
 
   </main>
+
+  <script>
+    // Universal account login — same backend + localStorage keys as /factions-remote-console,
+    // so a login here carries across every wolver002.com page (shared origin).
+    var SERVER = "https://admin.wolver002.com";
+    var userToken = localStorage.getItem("rc_user_token") || "";
+    var userName = localStorage.getItem("rc_user_name") || "";
+
+    function updateAuthBtn() {
+      var btn = document.getElementById("auth-btn");
+      if (userToken && userName) {
+        btn.innerHTML = '<span class="uname">' + userName + '</span> &#8226; Log Out';
+        btn.onclick = doLogout;
+      } else {
+        btn.innerHTML = 'Log In';
+        btn.onclick = openAuth;
+      }
+    }
+    function openAuth() {
+      document.getElementById("auth-err").textContent = "";
+      document.getElementById("auth-user").value = "";
+      document.getElementById("auth-pass").value = "";
+      document.getElementById("auth-modal").classList.add("show");
+      setTimeout(function() { document.getElementById("auth-user").focus(); }, 100);
+    }
+    function closeAuth() { document.getElementById("auth-modal").classList.remove("show"); }
+
+    function authRequest(path, okMsg) {
+      var u = document.getElementById("auth-user").value.trim();
+      var p = document.getElementById("auth-pass").value;
+      if (!u || !p) { document.getElementById("auth-err").textContent = "Fill in both fields"; return; }
+      fetch(SERVER + path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: u, password: p })
+      }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.error) { document.getElementById("auth-err").textContent = d.error; return; }
+        userToken = d.token;
+        userName = d.username;
+        localStorage.setItem("rc_user_token", userToken);
+        localStorage.setItem("rc_user_name", userName);
+        closeAuth();
+        updateAuthBtn();
+      }).catch(function() { document.getElementById("auth-err").textContent = "Server offline"; });
+    }
+    function doLogin() { authRequest("/account/login"); }
+    function doSignup() { authRequest("/account/signup"); }
+    function doLogout() {
+      userToken = ""; userName = "";
+      localStorage.removeItem("rc_user_token");
+      localStorage.removeItem("rc_user_name");
+      updateAuthBtn();
+    }
+
+    document.getElementById("auth-modal").addEventListener("click", function(e) {
+      if (e.target === this) closeAuth();
+    });
+    document.getElementById("auth-pass").addEventListener("keydown", function(e) {
+      if (e.key === "Enter") doLogin();
+    });
+    document.addEventListener("keydown", function(e) {
+      if (e.key === "Escape") closeAuth();
+    });
+    // reflect login state saved by any other page
+    window.addEventListener("storage", function(e) {
+      if (e.key === "rc_user_token" || e.key === "rc_user_name") {
+        userToken = localStorage.getItem("rc_user_token") || "";
+        userName = localStorage.getItem("rc_user_name") || "";
+        updateAuthBtn();
+      }
+    });
+    updateAuthBtn();
+  </script>
 </body>
 </html>
