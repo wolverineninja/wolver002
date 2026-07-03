@@ -413,6 +413,7 @@ body.noArrows .pmarker .arrow{display:none}
       <button class="snavbtn on" data-tab=general onclick="setSettingsTab('general')">General</button>
       <button class=snavbtn data-tab=waypoints onclick="setSettingsTab('waypoints')">Waypoints</button>
       <button class=snavbtn data-tab=heatmap onclick="setSettingsTab('heatmap')">Heatmap</button>
+      <button class=snavbtn data-tab=db onclick="setSettingsTab('db')">2atabase</button>
     </div>
     <div class=sbody>
       <div class=spane id=paneGeneral data-tab=general>
@@ -458,6 +459,16 @@ body.noArrows .pmarker .arrow{display:none}
         <div class=setrow>
           <div class=setlab>Trail length<div class=setsub>Seconds a player stays on the heatmap before fading</div></div>
           <input id=heatTrailSecs class=setnum type=number min=1 step=1 value=10 onchange=setHeatTrail(this.value)>
+        </div>
+      </div>
+      <div class=spane id=paneDb data-tab=db style=display:none>
+        <div class=setrow>
+          <div class=setlab>Overlap sessions<div class=setsub>Keep session trails on the map when you play another, so you can compare 2+ at once</div></div>
+          <button class=mcbtn id=setOverlapBtn onclick=toggleSessOverlap()>OFF</button>
+        </div>
+        <div class=setrow>
+          <div class=setlab>Clear trails<div class=setsub>Remove every session trail from the map</div></div>
+          <button class=mcbtn onclick=clearAllTrails()>Clear</button>
         </div>
       </div>
       <button class=mcbtn id=setClose onclick=toggleSettings()>Close</button>
@@ -1340,8 +1351,10 @@ function renderSessList() {
 
 // click a name -> expand/collapse their session dropdown
 async function selectSessPlayer(name) {
+  // collapsing = the "hide my trail" gesture, so that always clears; switching players
+  // parks the trail instead when Overlap sessions is on (compare players side by side)
   if (sessSel === name) { sessSel = null; sessData = null; clearSessPlay(); renderSessList(); return; }
-  clearSessPlay();
+  stashSessPlay();
   sessSel = name; sessData = null;
   renderSessList();
   let d;
@@ -1357,20 +1370,53 @@ function sessTagIcon(color, text) {
     `<div class=strail><div class=sdot style="background:${color}"></div>` +
     (text ? `<div class=slabel style="color:${color}">${text}</div>` : '') + '</div>' });
 }
+// ── Overlap sessions (Settings > 2atabase): keep old trails on the map to compare 2+ at once ──
+let sessOverlap = localStorage.getItem('sessOverlap') === '1';
+let parkedTrails = [];                             // finished-with trails kept visible in overlap mode
+function toggleSessOverlap() {
+  sessOverlap = !sessOverlap;
+  localStorage.setItem('sessOverlap', sessOverlap ? '1' : '0');
+  document.getElementById('setOverlapBtn').textContent = sessOverlap ? 'ON' : 'OFF';
+  if (!sessOverlap) { clearParkedTrails(); renderSessList(); }
+}
+document.getElementById('setOverlapBtn').textContent = sessOverlap ? 'ON' : 'OFF';
+function clearTrail(p) {
+  clearInterval(p.timer); clearInterval(p.refresh);
+  [p.under, p.line, p.head, p.startDot].forEach(l => map.removeLayer(l));
+}
+function parkTrail(p) {
+  parkedTrails.push(p);
+  while (parkedTrails.length > 8) clearTrail(parkedTrails.shift());   // keep the clutter sane
+}
+function clearParkedTrails() { parkedTrails.forEach(clearTrail); parkedTrails = []; }
+function clearAllTrails() { clearParkedTrails(); clearSessPlay(); renderSessList(); }
+// with overlap on, the current trail is parked (stays visible) instead of removed
+function stashSessPlay() {
+  if (sessPlay && sessOverlap) { parkTrail(sessPlay); sessPlay = null; }
+  else clearSessPlay();
+}
+
 // a trail (server session or one saved on this device) draws itself from start to finish
 function beginTrail(s, col, idxTag, name) {
-  clearSessPlay();
+  // replaying a session that's already parked: remove the old copy so it doesn't double up
+  parkedTrails = parkedTrails.filter(p => {
+    if (p.name === name && p.startTs === s.start) { clearTrail(p); return false; }
+    return true;
+  });
+  if (sessPlay && sessPlay.name === name && sessPlay.startTs === s.start) clearSessPlay();  // replay = restart
+  else stashSessPlay();
   if (!s.points || !s.points.length) return;
   const lls = s.points.map(([x, y, z]) => toLatLng(x, z));
   const under = L.polyline([], { color: '#000', weight: 5, opacity: .55, interactive: false }).addTo(map);
   const line = L.polyline([], { color: col, weight: 2, opacity: .95, interactive: false }).addTo(map);
   const startDot = L.marker(lls[0], { icon: sessTagIcon(col, 'start'), zIndexOffset: 1500, interactive: false }).addTo(map);
   const head = L.marker(lls[0], { icon: sessTagIcon(col, ''), zIndexOffset: 1600, interactive: false }).addTo(map);
-  sessPlay = { idx: idxTag, name, startTs: s.start, endTs: s.end, live: !!s.live, col, lls,
-               under, line, head, startDot, drawn: 1, prog: 1, dir: 1, last: Date.now(), timer: null, refresh: null, done: false };
+  const p = { idx: idxTag, name, startTs: s.start, endTs: s.end, live: !!s.live, col, lls,
+              under, line, head, startDot, drawn: 1, prog: 1, dir: 1, last: Date.now(), timer: null, refresh: null, done: false };
+  sessPlay = p;
   map.fitBounds(L.latLngBounds(lls), { maxZoom: BASE_ZOOM - 1, animate: false });
-  sessPlay.timer = setInterval(advanceSessPlay, 30);   // time-based, speed set by the ×-button
-  advanceSessPlay();
+  p.timer = setInterval(() => advanceTrail(p), 30);   // time-based, speed set by the ×-button
+  advanceTrail(p);
   renderSessList();
 }
 function startSessPlay(i) {
@@ -1403,14 +1449,15 @@ function deleteSavedSession(id) {
   savedSess = savedSess.filter(x => x.id !== id);
   localStorage.setItem('savedSessions', JSON.stringify(savedSess));
   if (sessPlay && sessPlay.idx === 'sv:' + id) clearSessPlay();
+  parkedTrails = parkedTrails.filter(p => p.idx !== 'sv:' + id || (clearTrail(p), false));
   renderSessList();
 }
 function startSavedPlay(id) {
   const s = savedSess.find(x => x.id === id); if (!s) return;
   beginTrail({ ...s, live: false }, '#4fd6e0', 'sv:' + id, s.username);
 }
-function advanceSessPlay() {
-  const p = sessPlay; if (!p || p.done) return;
+function advanceTrail(p) {
+  if (!p || p.done) return;
   const now = Date.now();
   p.prog = Math.max(1, Math.min(p.lls.length,
     p.prog + p.dir * (now - p.last) / 1000 * SESS_SPEEDS[sessSpeedIdx][1]));
@@ -1423,7 +1470,7 @@ function advanceSessPlay() {
     clearInterval(p.timer); p.timer = null; p.done = true;
     const nowS = Math.floor(Date.now() / 1000);
     p.head.setIcon(sessTagIcon(p.col, p.live ? 'online now' : `finish &middot; ${fmtAgo(Math.max(0, nowS - p.endTs))}`));
-    if (p.live) p.refresh = setInterval(extendLiveTrail, 30000);   // keep growing while they play
+    if (p.live) p.refresh = setInterval(() => extendLiveTrail(p), 30000);   // keep growing while they play
   } else if (p.dir < 0 && p.prog <= 1) {               // rewound all the way: rest at the start
     clearInterval(p.timer); p.timer = null; p.dir = 1;
   }
@@ -1437,12 +1484,12 @@ function rewindSessPlay() {
     p.head.setIcon(sessTagIcon(p.col, ''));
   }
   p.dir = -1; p.last = Date.now();
-  if (!p.timer) p.timer = setInterval(advanceSessPlay, 30);
+  if (!p.timer) p.timer = setInterval(() => advanceTrail(p), 30);
 }
 function finishSessPlay() {
   const p = sessPlay; if (!p || p.done) return;
   p.dir = 1; p.prog = p.lls.length;
-  advanceSessPlay();
+  advanceTrail(p);
 }
 // speed button -> dropdown of all speeds; picking one takes effect mid-draw too
 function openSpeedMenu() {
@@ -1470,21 +1517,19 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSpeedMenu(); });
 function clearSessPlay() {
-  const p = sessPlay; if (!p) return;
-  clearInterval(p.timer); clearInterval(p.refresh);
-  [p.under, p.line, p.head, p.startDot].forEach(l => map.removeLayer(l));
+  if (!sessPlay) return;
+  clearTrail(sessPlay);
   sessPlay = null;
 }
 // a live session's line keeps extending as new samples come in
-async function extendLiveTrail() {
-  const p = sessPlay; if (!p || !p.done || !p.live) return;
+async function extendLiveTrail(p) {
+  if (!p || !p.done || !p.live) return;
   let d;
   try { d = await (await fetch(`${SESS_API}?name=${encodeURIComponent(p.name)}`, { cache: 'no-store' })).json(); }
   catch (e) { return; }
-  if (sessPlay !== p) return;
   const s = (d.sessions || []).find(x => x.start === p.startTs);
   if (!s) { clearInterval(p.refresh); p.refresh = null; return; }  // session rolled off
-  sessData = d;
+  if (sessPlay === p && sessSel === p.name) sessData = d;   // parked trails keep growing without clobbering the open list
   p.lls = s.points.map(([x, y, z]) => toLatLng(x, z));
   p.endTs = s.end; p.live = s.live;
   p.under.setLatLngs(p.lls); p.line.setLatLngs(p.lls);
