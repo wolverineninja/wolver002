@@ -462,9 +462,14 @@ body.noArrows .pmarker .arrow{display:none}
         </div>
       </div>
       <div class=spane id=paneDb data-tab=db style=display:none>
+        <div class=wpfhead style=margin-top:0><span class=wpfdiv>Session</span></div>
         <div class=setrow>
           <div class=setlab>Overlap sessions<div class=setsub>Keep session trails on the map when you play another, so you can compare 2+ at once</div></div>
           <button class=mcbtn id=setOverlapBtn onclick=toggleSessOverlap()>OFF</button>
+        </div>
+        <div class=setrow>
+          <div class=setlab>Play at the same time<div class=setsub>When you play another session, restart the trails already on the map so they all draw together</div></div>
+          <button class=mcbtn id=setSyncBtn onclick=toggleSessSync()>OFF</button>
         </div>
         <div class=setrow>
           <div class=setlab>Clear trails<div class=setsub>Remove every session trail from the map</div></div>
@@ -1380,6 +1385,24 @@ function toggleSessOverlap() {
   if (!sessOverlap) { clearParkedTrails(); renderSessList(); }
 }
 document.getElementById('setOverlapBtn').textContent = sessOverlap ? 'ON' : 'OFF';
+// "Play at the same time": starting a session also restarts every trail already on the map,
+// so overlapped trails draw together (race them side by side)
+let sessSync = localStorage.getItem('sessSync') === '1';
+function toggleSessSync() {
+  sessSync = !sessSync;
+  localStorage.setItem('sessSync', sessSync ? '1' : '0');
+  document.getElementById('setSyncBtn').textContent = sessSync ? 'ON' : 'OFF';
+}
+document.getElementById('setSyncBtn').textContent = sessSync ? 'ON' : 'OFF';
+function restartTrail(p) {
+  if (p.done) {
+    p.done = false;
+    clearInterval(p.refresh); p.refresh = null;
+    p.head.setIcon(sessTagIcon(p.col, ''));
+  }
+  p.dir = 1; p.prog = 1; p.drawn = 1; p.last = Date.now();
+  if (!p.timer) p.timer = setInterval(() => advanceTrail(p), 30);
+}
 function clearTrail(p) {
   clearInterval(p.timer); clearInterval(p.refresh);
   [p.under, p.line, p.head, p.startDot].forEach(l => map.removeLayer(l));
@@ -1414,7 +1437,10 @@ function beginTrail(s, col, idxTag, name) {
   const p = { idx: idxTag, name, startTs: s.start, endTs: s.end, live: !!s.live, col, lls,
               under, line, head, startDot, drawn: 1, prog: 1, dir: 1, last: Date.now(), timer: null, refresh: null, done: false };
   sessPlay = p;
-  map.fitBounds(L.latLngBounds(lls), { maxZoom: BASE_ZOOM - 1, animate: false });
+  if (sessSync) parkedTrails.forEach(restartTrail);   // Play at the same time: everyone draws together
+  // frame every visible trail, not just the new one
+  const allPts = parkedTrails.reduce((a, t) => a.concat(t.lls), lls.slice());
+  map.fitBounds(L.latLngBounds(allPts), { maxZoom: BASE_ZOOM - 1, animate: false });
   p.timer = setInterval(() => advanceTrail(p), 30);   // time-based, speed set by the ×-button
   advanceTrail(p);
   renderSessList();
