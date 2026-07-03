@@ -638,8 +638,9 @@ function setWpFilter(f) {
   if (f === 'community' && localStorage.getItem('wpCommunityAck2') !== '1') openWpAck();
 }
 function renderWpFilter() {
-  // filters just control which waypoints show on the map (no descriptions)
+  // filters control which waypoints show on the map
   if (wpFilter === 'personal') wpLayer.addTo(map); else map.removeLayer(wpLayer);
+  if (wpFilter === 'community') { cwpLayer.addTo(map); loadCommunityWps(); } else map.removeLayer(cwpLayer);
   const note = document.getElementById('wpNotice');
   if (note) {
     if (wpFilter === 'community') {
@@ -647,11 +648,36 @@ function renderWpFilter() {
       note.style.display = 'block';
     } else { note.style.display = 'none'; }
   }
-  // Phase 2: community waypoints only display once acknowledged (localStorage wpCommunityAck2)
 }
 function openWpAck() { document.getElementById('wpAckModal').classList.add('open'); }
 function wpAckCancel() { document.getElementById('wpAckModal').classList.remove('open'); setWpFilter('personal'); }
 function ackCommunity() { localStorage.setItem('wpCommunityAck2', '1'); document.getElementById('wpAckModal').classList.remove('open'); }
+
+// ── Community waypoints: shared, posted only by whitelisted/trusted accounts, visible to everyone ──
+const CWP_API = 'https://admin.wolver002.com/factions/api/waypoints';
+let communityWps = [];
+function cwpIcon(w) {
+  return L.divIcon({ className: '', iconSize: [0, 0],
+    html: `<div class=wpmark><div class=dia style="background:#e0b64f"></div><div class=wlabel style="color:#e0b64f">${escapeHtml(w.name)} <span style="opacity:.65">&middot; ${escapeHtml(w.username)}</span></div></div>` });
+}
+function renderCommunityWps() {
+  cwpLayer.clearLayers();
+  for (const w of communityWps) L.marker(toLatLng(w.x, w.z), { icon: cwpIcon(w), zIndexOffset: 1800 }).addTo(cwpLayer);
+}
+function loadCommunityWps() {
+  fetch(CWP_API, { cache: 'no-store' }).then(r => r.json()).then(d => { communityWps = d.waypoints || []; renderCommunityWps(); }).catch(() => {});
+}
+function addCommunityWaypoint(x, z) {
+  if (!userToken) { openAuth(); return; }                 // must be logged in to post a community waypoint
+  const name = prompt('Community waypoint name:', 'Waypoint');
+  if (name === null) return;
+  fetch(CWP_API, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: userToken, name: name.trim() || 'Waypoint', x: Math.round(x), z: Math.round(z) }) })
+    .then(r => r.json()).then(d => {
+      if (d.error) { alert(d.error); return; }             // e.g. "must be whitelisted"
+      communityWps.unshift(d); renderCommunityWps();
+    }).catch(() => alert('Failed to post waypoint'));
+}
 updateAuthBtn();   // default filter 'personal' + wpLayer already on the map = correct initial state
 
 // Minecraft button-click sound — Web Audio for near-zero latency (decode once, play instantly),
@@ -706,6 +732,7 @@ function toggleSidebar() {
 const markers = new Map();   // id -> {marker, skin}
 const playersLayer = L.layerGroup().addTo(map);   // all player markers live here so the eye icon can hide them
 const wpLayer = L.layerGroup().addTo(map);        // personal waypoint markers — toggled by the Waypoints filter
+const cwpLayer = L.layerGroup();                  // community waypoint markers — shown under the Community filter
 let followId = null;
 let lastPlayers = [];
 
@@ -899,6 +926,7 @@ function renderWaypoints() {
   }
 }
 function addWaypoint(x, z) {
+  if (wpFilter === 'community') return addCommunityWaypoint(x, z);   // community placement needs login + trusted
   if (waypoints.length >= 100) { alert('You can have up to 100 waypoints.'); return; }
   const name = prompt('Waypoint name:', 'Waypoint ' + (waypoints.length + 1));
   if (name === null) return;
@@ -938,6 +966,11 @@ renderWaypoints();
 // "Add" waypoint from Settings > General: arm place-mode, then the next map click drops one
 let wpPlaceMode = false;
 function startWpPlace() {
+  if (wpFilter === 'community' && !userToken) {   // must be logged in to place a community waypoint
+    document.getElementById('settingsModal').classList.remove('open');
+    openAuth();
+    return;
+  }
   wpPlaceMode = true;
   document.getElementById('settingsModal').classList.remove('open');
   document.getElementById('wpBanner').classList.add('on');
