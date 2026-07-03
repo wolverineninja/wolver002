@@ -409,6 +409,10 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
           <div class=setlab>Y Axis<div class=setsub>Show players' Y (height) coordinate</div></div>
           <button class=mcbtn data-ext=y onclick="toggleExt('y')">OFF</button>
         </div>
+        <div class=setrow>
+          <div class=setlab>Click sound<div class=setsub>Play the button click sound when pressing buttons</div></div>
+          <button class=mcbtn id=setClickBtn onclick=toggleClickSound()>ON</button>
+        </div>
       </div>
       <div class=spane id=paneWaypoints data-tab=waypoints style=display:none>
         <div class=setrow>
@@ -747,8 +751,20 @@ window.addEventListener('pointerdown', function _warm() {
   if (_actx && _actx.state === 'suspended') _actx.resume();
   window.removeEventListener('pointerdown', _warm, true);
 }, true);
+// Settings > General > Click sound: on by default, remembered per browser
+let clickSoundOn = localStorage.getItem('clickSound') !== '0';
+function syncClickBtn() {
+  const b = document.getElementById('setClickBtn');
+  if (b) b.textContent = clickSoundOn ? 'ON' : 'OFF';
+}
+function toggleClickSound() {
+  clickSoundOn = !clickSoundOn;
+  localStorage.setItem('clickSound', clickSoundOn ? '1' : '0');
+  syncClickBtn();
+}
+syncClickBtn();
 document.addEventListener('pointerdown', e => {
-  if (!e.target.closest('.mcbtn, .snavbtn') || !_actx || !_clickBuf) return;
+  if (!clickSoundOn || !e.target.closest('.mcbtn, .snavbtn') || !_actx || !_clickBuf) return;
   if (_actx.state === 'suspended') _actx.resume();
   const src = _actx.createBufferSource(); src.buffer = _clickBuf;
   const g = _actx.createGain(); g.gain.value = 0.5;
