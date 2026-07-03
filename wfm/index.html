@@ -685,11 +685,13 @@ let cwpTimer = null;
 function renderWpFilter() {
   // filters control which waypoints show on the map
   if (wpFilter === 'personal') wpLayer.addTo(map); else map.removeLayer(wpLayer);
-  if (wpFilter === 'community') {
-    cwpLayer.addTo(map); loadCommunityWps();
+  if (wpFilter === 'community') cwpLayer.addTo(map); else map.removeLayer(cwpLayer);
+  if (wpFilter === 'trusted') twpLayer.addTo(map); else map.removeLayer(twpLayer);
+  if (wpFilter === 'community' || wpFilter === 'trusted') {
+    loadCommunityWps();
     clearInterval(cwpTimer); cwpTimer = setInterval(loadCommunityWps, 15000);   // stay live, no refresh needed
   } else {
-    map.removeLayer(cwpLayer); clearInterval(cwpTimer); cwpTimer = null;
+    clearInterval(cwpTimer); cwpTimer = null;
   }
   const note = document.getElementById('wpNotice');
   if (note) {
@@ -703,17 +705,20 @@ function openWpAck() { document.getElementById('wpAckModal').classList.add('open
 function wpAckCancel() { document.getElementById('wpAckModal').classList.remove('open'); setWpFilter('personal'); }
 function ackCommunity() { localStorage.setItem('wpCommunityAck2', '1'); document.getElementById('wpAckModal').classList.remove('open'); }
 
-// ── Community waypoints: shared, posted only by whitelisted/trusted accounts, visible to everyone ──
+// ── Shared waypoints, visible to everyone. Two tiers: 'community' (any logged-in
+//    account can place) and 'trusted' (only whitelisted/trusted accounts can place). ──
 const CWP_API = 'https://admin.wolver002.com/factions/api/waypoints';
 let communityWps = [];
 function cwpIcon(w) {
+  const col = w.tier === 'trusted' ? '#54e07a' : '#e0b64f';   // trusted = green, community = gold
   return L.divIcon({ className: '', iconSize: [0, 0],
-    html: `<div class=wpmark><div class=dia style="background:#e0b64f"></div><div class=wlabel style="color:#e0b64f">${escapeHtml(w.name)} <span style="opacity:.65">&middot; ${escapeHtml(w.username)}</span></div></div>` });
+    html: `<div class=wpmark><div class=dia style="background:${col}"></div><div class=wlabel style="color:${col}">${escapeHtml(w.name)} <span style="opacity:.65">&middot; ${escapeHtml(w.username)}</span></div></div>` });
 }
 function renderCommunityWps() {
-  cwpLayer.clearLayers();
+  cwpLayer.clearLayers(); twpLayer.clearLayers();
   for (const w of communityWps) {
-    const m = L.marker(toLatLng(w.x, w.z), { icon: cwpIcon(w), zIndexOffset: 1800 }).addTo(cwpLayer);
+    const m = L.marker(toLatLng(w.x, w.z), { icon: cwpIcon(w), zIndexOffset: 1800 })
+      .addTo(w.tier === 'trusted' ? twpLayer : cwpLayer);
     m.on('click', () => openCwpMenu(w));
   }
 }
@@ -741,14 +746,15 @@ function deleteCwp() {
 function loadCommunityWps() {
   fetch(CWP_API, { cache: 'no-store' }).then(r => r.json()).then(d => { communityWps = d.waypoints || []; renderCommunityWps(); }).catch(() => {});
 }
-function addCommunityWaypoint(x, z) {
-  if (!userToken) { openAuth(); return; }                 // must be logged in to post a community waypoint
-  const name = prompt('Community waypoint name:', 'Waypoint');
+function addCommunityWaypoint(x, z, tier) {
+  if (!userToken) { openAuth(); return; }                 // must be logged in to post a shared waypoint
+  tier = tier === 'trusted' ? 'trusted' : 'community';
+  const name = prompt((tier === 'trusted' ? 'Trusted' : 'Community') + ' waypoint name:', 'Waypoint');
   if (name === null) return;
   fetch(CWP_API, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token: userToken, name: name.trim() || 'Waypoint', x: Math.round(x), z: Math.round(z) }) })
+    body: JSON.stringify({ token: userToken, name: name.trim() || 'Waypoint', x: Math.round(x), z: Math.round(z), tier }) })
     .then(r => r.json()).then(d => {
-      if (d.error) { alert(d.error); return; }             // e.g. "must be whitelisted"
+      if (d.error) { alert(d.error); return; }             // e.g. "only whitelisted accounts"
       communityWps.unshift(d); renderCommunityWps();
     }).catch(() => alert('Failed to post waypoint'));
 }
@@ -832,6 +838,7 @@ const markers = new Map();   // id -> {marker, skin}
 const playersLayer = L.layerGroup().addTo(map);   // all player markers live here so the eye icon can hide them
 const wpLayer = L.layerGroup().addTo(map);        // personal waypoint markers — toggled by the Waypoints filter
 const cwpLayer = L.layerGroup();                  // community waypoint markers — shown under the Community filter
+const twpLayer = L.layerGroup();                  // trusted waypoint markers — shown under the Trusted filter
 setWpFilter(wpFilter, true);                      // restore the remembered filter (skip the ack popup on load)
 let followId = null;
 let lastPlayers = [];
@@ -1026,7 +1033,8 @@ function renderWaypoints() {
   }
 }
 function addWaypoint(x, z) {
-  if (wpFilter === 'community') return addCommunityWaypoint(x, z);   // community placement needs login + trusted
+  if (wpFilter === 'community' || wpFilter === 'trusted')            // shared placement needs login (trusted tier: whitelist)
+    return addCommunityWaypoint(x, z, wpFilter);
   if (waypoints.length >= 100) { alert('You can have up to 100 waypoints.'); return; }
   const name = prompt('Waypoint name:', 'Waypoint ' + (waypoints.length + 1));
   if (name === null) return;
@@ -1066,7 +1074,7 @@ renderWaypoints();
 // "Add" waypoint from Settings > General: arm place-mode, then the next map click drops one
 let wpPlaceMode = false;
 function startWpPlace() {
-  if (wpFilter === 'community' && !userToken) {   // must be logged in to place a community waypoint
+  if ((wpFilter === 'community' || wpFilter === 'trusted') && !userToken) {   // must be logged in to place a shared waypoint
     document.getElementById('settingsModal').classList.remove('open');
     openAuth();
     return;
