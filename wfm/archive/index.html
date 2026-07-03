@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang=en>
+<head>
+<meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name=description content="Wolver Factions Map — archived pre-reset world snapshot">
+<title>Wolver Factions Map — Archive</title>
+<link rel=icon type=image/png href=../favicon.png>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+@font-face{font-family:MC;src:url(../Minecraft.otf);font-weight:normal}
+@font-face{font-family:MC;src:url(../Minecraft-Bold.otf);font-weight:bold}
+
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;background:#000}
+body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth:never}
+.sh{text-shadow:2px 2px #3e3e3e}
+.gray{color:#aaa;text-shadow:2px 2px #2a2a2a}
+.yellow{color:#ffff55;text-shadow:2px 2px #3e3e15}
+
+#map{position:fixed;inset:0;background:#000;cursor:grab}
+#map:active{cursor:grabbing}
+.leaflet-container{background:#000;font:inherit}
+
+.mcbtn{font-family:MC,monospace;font-size:16px;color:#fff;text-shadow:2px 2px #3e3e3e;cursor:pointer;
+  background:#6d6d6d;border:2px solid;border-color:#a6a6a6 #383838 #383838 #a6a6a6;outline:2px solid #000;
+  padding:6px 14px 8px;user-select:none}
+.mcbtn:hover{background:#7c81b8;border-color:#b6bae6 #43436e #43436e #b6bae6}
+.mcbtn:active{border-color:#383838 #a6a6a6 #a6a6a6 #383838}
+
+#bar{position:fixed;top:0;left:0;right:0;z-index:20;display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  padding:8px 14px;background:rgba(0,0,0,.62);border-bottom:2px solid #000}
+#bar .title{font-weight:bold;font-size:20px;padding-right:2px}
+#bar .sub{font-size:14px;margin-top:2px}
+.spacer{flex:1}
+
+#coords{position:fixed;left:12px;bottom:12px;z-index:15;background:rgba(0,0,0,.62);
+  border:2px solid #000;padding:6px 10px 8px;font-size:14px}
+
+.bmarker{position:relative}
+.bmarker .flag{position:absolute;left:50%;top:50%;width:12px;height:12px;transform:translate(-50%,-50%) rotate(45deg);
+  background:#f5c542;box-shadow:0 0 0 2px #000}
+.bmarker .bname{position:absolute;left:50%;top:14px;transform:translateX(-50%);white-space:nowrap;
+  font-family:MC,monospace;font-size:12px;color:#fff;text-shadow:1px 1px #3e3e3e;
+  background:rgba(0,0,0,.5);padding:1px 4px 2px;pointer-events:none}
+body.noBases .bmarker{display:none}
+</style>
+</head>
+<body>
+<div id=map></div>
+
+<div id=bar>
+  <div>
+    <div class="title sh">Wolver Factions Map</div>
+    <div class="sub yellow">WORLD ARCHIVE &middot; July 3, 2026 (pre-reset)</div>
+  </div>
+  <div class=spacer></div>
+  <button class=mcbtn id=basesBtn onclick=toggleBases()>Bases: ON</button>
+  <button class=mcbtn onclick="location.href='../'">Live Map</button>
+</div>
+
+<div id=coords class=gray>x 0 &middot; z 0</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ═══ Config ═══
+// Tiles were snapshotted from factionsvr.com on 2026-07-03, right before the map
+// reset, and are served read-only from the wolver server. Full world exists down
+// to tile-zoom -4 (1px/block); deeper zooms only where players were active, so
+// missing deep tiles fall back to the parent tile scaled up (never black holes).
+const ARCHIVE = 'https://admin.wolver002.com/factions/archive/2026-07-03';
+
+// Same tile scheme as the live map so coordinates line up
+const CHUNK_SIZE = 16, TILE_SIZE = 256, BASE_ZOOM = 12, MAX_ZOOM = 15;
+const MIN_TZ = -8;                       // coarsest archived tile zoom
+const MIN_ZOOM = BASE_ZOOM + MIN_TZ;     // no minNativeZoom scaling here, so clamp instead
+const UPB = (TILE_SIZE / Math.pow(2, BASE_ZOOM)) / CHUNK_SIZE;
+const toLatLng = (x, z) => [-z * UPB, x * UPB];
+
+const map = L.map('map', {
+  crs: L.CRS.Simple, center: toLatLng(175.5, 414.5), zoom: BASE_ZOOM - 4,
+  minZoom: MIN_ZOOM, maxZoom: MAX_ZOOM, zoomControl: false, attributionControl: false
+});
+new ResizeObserver(() => map.invalidateSize()).observe(document.getElementById('map'));
+
+// ═══ Archive tile layer with parent-tile fallback ═══
+// Div tiles with background-image: a request at (tz,x,z) that 404s retries the
+// parent tile one level up, scaled 2x and cropped to the right quadrant, until
+// something loads. Overzoom past tz 0 uses the same path (starts at tz 0).
+L.GridLayer.Archive = L.GridLayer.extend({
+  createTile(coords, done) {
+    const tile = document.createElement('div');
+    tile.style.imageRendering = 'pixelated';
+    const tzo = coords.z - BASE_ZOOM;
+    const attempt = (t) => {
+      if (t < MIN_TZ) { done(null, tile); return; }
+      const d = tzo - t, s = Math.pow(2, d);
+      const tx = Math.floor(coords.x / s), ty = Math.floor(coords.y / s);
+      const img = new Image();
+      img.onload = () => {
+        tile.style.backgroundImage = `url(${img.src})`;
+        tile.style.backgroundSize = `${TILE_SIZE * s}px ${TILE_SIZE * s}px`;
+        tile.style.backgroundPosition = `${-(coords.x - tx * s) * TILE_SIZE}px ${-(coords.y - ty * s) * TILE_SIZE}px`;
+        done(null, tile);
+      };
+      img.onerror = () => attempt(t - 1);
+      img.src = `${ARCHIVE}/tiles/${t}/${tx}/${ty}.png`;
+    };
+    attempt(Math.min(tzo, 0));
+    return tile;
+  }
+});
+new L.GridLayer.Archive({
+  tileSize: TILE_SIZE, noWrap: true, keepBuffer: 8,
+  updateWhenZooming: false, updateWhenIdle: false
+}).addTo(map);
+
+// ═══ Archived bases overlay ═══
+let basesOn = localStorage.getItem('archBasesOn') !== '0';
+function applyBases() {
+  document.body.classList.toggle('noBases', !basesOn);
+  document.getElementById('basesBtn').textContent = 'Bases: ' + (basesOn ? 'ON' : 'OFF');
+}
+function toggleBases() {
+  basesOn = !basesOn;
+  localStorage.setItem('archBasesOn', basesOn ? '1' : '0');
+  applyBases();
+}
+applyBases();
+
+fetch(`${ARCHIVE}/bases.json`).then(r => r.json()).then(d => {
+  (d.bases || []).forEach(b => {
+    const icon = L.divIcon({
+      className: 'bmarker', iconSize: [0, 0],
+      html: `<div class=flag></div><div class=bname>${String(b.username).replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</div>`
+    });
+    L.marker(toLatLng(b.x, b.z), { icon, interactive: false }).addTo(map);
+  });
+}).catch(() => {});
+
+// ═══ Cursor coordinates ═══
+map.on('mousemove', e => {
+  const x = Math.round(e.latlng.lng / UPB), z = Math.round(-e.latlng.lat / UPB);
+  document.getElementById('coords').innerHTML = `x ${x} &middot; z ${z}`;
+});
+</script>
+</body>
+</html>
