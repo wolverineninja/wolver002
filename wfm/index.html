@@ -129,8 +129,11 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 .dbtabs .mcbtn{flex:1;font-size:14px;padding:5px 8px 7px}
 .dbtabs .mcbtn.on{background:#7c81b8;border-color:#fff}
 #dbSection,#sessSection{flex:1;min-height:0;display:flex;flex-direction:column}
-.dbnote{font-size:11px;color:#ffd98a;text-shadow:1px 1px #000;background:rgba(120,90,20,.22);
+.dbnote{position:relative;font-size:11px;color:#ffd98a;text-shadow:1px 1px #000;background:rgba(120,90,20,.22);
   border:1px solid #6a5015;padding:5px 7px;margin-bottom:7px;line-height:1.35}
+#sessNote{padding-right:18px}
+.dbnote .nx{position:absolute;top:2px;right:4px;cursor:pointer;color:#c8a24a;padding:0 2px;font-size:12px;line-height:1}
+.dbnote .nx:hover{color:#fff}
 #dbSearch,#sessSearch{font-family:MC,monospace;background:#000;border:2px solid #a0a0a0;color:#fff;font-size:14px;
   padding:6px 8px;margin-bottom:7px;outline:0}
 #dbSearch:focus,#sessSearch:focus{border-color:#fff}
@@ -293,7 +296,7 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
     <div id=dbList><div class=pempty>Open to load...</div></div>
   </div>
   <div id=sessSection style=display:none>
-    <div class=dbnote>Click a player to list their last 3 join sessions (each rejoin rolls the oldest off). Click a session and its path draws from start to finish &mdash; Rewind plays it backwards, Finish skips to the end. Click the player's name again to hide the trail.</div>
+    <div class=dbnote id=sessNote><span class=nx onclick=dismissSessNote() title=Dismiss>x</span>Click a player to list their last 3 join sessions (each rejoin rolls the oldest off). Click a session and its path draws from start to finish &mdash; Rewind plays it backwards, Finish skips to the end. Click the player's name again to hide the trail.</div>
     <input id=sessSearch placeholder="Search player..." oninput=renderSessList() autocomplete=off spellcheck=false>
     <div id=sessList><div class=pempty>Open to load...</div></div>
   </div>
@@ -775,6 +778,13 @@ function setDbTab(t) {
   document.getElementById('tabBases').classList.toggle('on', t === 'bases');
   document.getElementById('tabSess').classList.toggle('on', t === 'sess');
 }
+
+// the Sessions how-to note can be dismissed; stays hidden per browser
+function dismissSessNote() {
+  document.getElementById('sessNote').style.display = 'none';
+  localStorage.setItem('sessNoteHidden', '1');
+}
+if (localStorage.getItem('sessNoteHidden')) document.getElementById('sessNote').style.display = 'none';
 
 async function refreshBases() {
   try { const d = await (await fetch(BASES_API, { cache: 'no-store' })).json(); baseData = d.bases || []; }
