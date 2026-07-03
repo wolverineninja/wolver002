@@ -183,6 +183,17 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 .wsw.on{border-color:#fff}
 .wsw:hover{border-color:#c3f4f8}
 #wpMenu .mcbtn{width:100%;font-size:13px}
+#cwpMenu{position:fixed;z-index:35;display:none;width:194px;background:rgba(0,0,0,.86);border:2px solid #000;
+  box-shadow:0 0 0 2px #7a5f1a;padding:8px}
+#cwpMenu.open{display:block}
+#cwpMenu .cwpm-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+#cwpMenu .cwpm-head span:first-child{flex:1;font-size:13px;color:#e0b64f;text-shadow:1px 1px #2a2004;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#cwpMenu .stop{cursor:pointer;color:#aaa;padding:0 3px}
+#cwpMenu .stop:hover{color:#fff}
+#cwpmInfo{font-size:11px;color:#bbb;text-shadow:1px 1px #000;margin-bottom:8px;line-height:1.5}
+#cwpmInfo b{color:#e0b64f}
+#cwpMenu .mcbtn{width:100%;font-size:13px}
 #wpBanner{position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:40;display:none;
   font-family:MC,monospace;font-size:14px;color:#c3f4f8;text-shadow:2px 2px #04222a;
   background:rgba(0,0,0,.82);border:2px solid #000;box-shadow:0 0 0 2px #2a6b72;padding:7px 14px 9px}
@@ -359,6 +370,11 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
   <div class=wpm-head><span id=wpmName></span><span class=stop onclick=closeWpMenu()>x</span></div>
   <div id=wpmSwatches></div>
   <button class=mcbtn onclick=deleteWp()>Delete</button>
+</div>
+<div id=cwpMenu>
+  <div class=cwpm-head><span id=cwpmName></span><span class=stop onclick=closeCwpMenu()>x</span></div>
+  <div id=cwpmInfo></div>
+  <button class=mcbtn id=cwpDelBtn onclick=deleteCwp()>Delete</button>
 </div>
 <div id=atPopup>
   <div class=at-head><span id=atTitle></span><span class=stop onclick=closeAt()>x</span></div>
@@ -637,10 +653,16 @@ function setWpFilter(f) {
   renderWpFilter();
   if (f === 'community' && localStorage.getItem('wpCommunityAck2') !== '1') openWpAck();
 }
+let cwpTimer = null;
 function renderWpFilter() {
   // filters control which waypoints show on the map
   if (wpFilter === 'personal') wpLayer.addTo(map); else map.removeLayer(wpLayer);
-  if (wpFilter === 'community') { cwpLayer.addTo(map); loadCommunityWps(); } else map.removeLayer(cwpLayer);
+  if (wpFilter === 'community') {
+    cwpLayer.addTo(map); loadCommunityWps();
+    clearInterval(cwpTimer); cwpTimer = setInterval(loadCommunityWps, 15000);   // stay live, no refresh needed
+  } else {
+    map.removeLayer(cwpLayer); clearInterval(cwpTimer); cwpTimer = null;
+  }
   const note = document.getElementById('wpNotice');
   if (note) {
     if (wpFilter === 'community') {
@@ -662,7 +684,31 @@ function cwpIcon(w) {
 }
 function renderCommunityWps() {
   cwpLayer.clearLayers();
-  for (const w of communityWps) L.marker(toLatLng(w.x, w.z), { icon: cwpIcon(w), zIndexOffset: 1800 }).addTo(cwpLayer);
+  for (const w of communityWps) {
+    const m = L.marker(toLatLng(w.x, w.z), { icon: cwpIcon(w), zIndexOffset: 1800 }).addTo(cwpLayer);
+    m.on('click', () => openCwpMenu(w));
+  }
+}
+let cwpMenuId = null;
+function openCwpMenu(w) {
+  cwpMenuId = w.id;
+  document.getElementById('cwpmName').textContent = w.name;
+  document.getElementById('cwpmInfo').innerHTML = 'by <b>' + escapeHtml(w.username) + '</b><br>' + Math.round(w.x) + ', ' + Math.round(w.z);
+  const owner = !!userToken && userName && userName.toLowerCase() === (w.username || '').toLowerCase();
+  document.getElementById('cwpDelBtn').style.display = owner ? 'block' : 'none';   // only the poster can delete
+  const el = document.getElementById('cwpMenu'); el.classList.add('open');
+  const pt = map.latLngToContainerPoint(toLatLng(w.x, w.z));
+  el.style.left = Math.max(8, Math.min(pt.x + 14, window.innerWidth - 206)) + 'px';
+  el.style.top = Math.max(58, Math.min(pt.y - 8, window.innerHeight - 170)) + 'px';
+}
+function closeCwpMenu() { cwpMenuId = null; document.getElementById('cwpMenu').classList.remove('open'); }
+function deleteCwp() {
+  const id = cwpMenuId; if (id == null) return;
+  fetch(CWP_API + '/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: userToken, id }) })
+    .then(r => r.json()).then(d => {
+      if (d.error) { alert(d.error); return; }
+      communityWps = communityWps.filter(w => w.id !== id); renderCommunityWps(); closeCwpMenu();
+    }).catch(() => alert('Failed to delete'));
 }
 function loadCommunityWps() {
   fetch(CWP_API, { cache: 'no-store' }).then(r => r.json()).then(d => { communityWps = d.waypoints || []; renderCommunityWps(); }).catch(() => {});
@@ -1025,7 +1071,7 @@ const fmtAgo = s => s < 60 ? s + 's ago' : s < 3600 ? Math.round(s / 60) + 'm ag
 function closeAt() { document.getElementById('atPopup').classList.remove('open'); }
 
 map.on('click', e => {
-  closeWpMenu();                           // clicking the map dismisses the waypoint menu
+  closeWpMenu(); closeCwpMenu();           // clicking the map dismisses the waypoint menus
   if (wpPlaceMode) {                       // placing a waypoint takes priority
     cancelWpPlace();
     addWaypoint(e.latlng.lng / UPB, -e.latlng.lat / UPB);
