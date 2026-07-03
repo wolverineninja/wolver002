@@ -295,14 +295,36 @@
     }
     function closeAuth() { document.getElementById("auth-modal").classList.remove("show"); }
 
-    function authRequest(path, okMsg) {
+    // stable per-device fingerprint (no email, so signup is limited to 1 account per device).
+    // recomputed each time (not stored), so clearing site data doesn't grant a new signup.
+    function deviceHwid() {
+      var parts = [
+        navigator.userAgent || "", navigator.language || "", navigator.platform || "",
+        (navigator.hardwareConcurrency || "") + "", (navigator.deviceMemory || "") + "",
+        screen.width + "x" + screen.height + "x" + screen.colorDepth,
+        (function(){ try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch(e){ return ""; } })()
+      ];
+      try {
+        var cv = document.createElement("canvas"), ctx = cv.getContext("2d");
+        ctx.textBaseline = "top"; ctx.font = "14px Arial";
+        ctx.fillStyle = "#f60"; ctx.fillRect(0, 0, 100, 20);
+        ctx.fillStyle = "#069"; ctx.fillText("wolver-hwid", 2, 2);
+        parts.push(cv.toDataURL());
+      } catch (e) {}
+      return crypto.subtle.digest("SHA-256", new TextEncoder().encode(parts.join("|"))).then(function(buf) {
+        return Array.from(new Uint8Array(buf)).map(function(b) { return ("0" + b.toString(16)).slice(-2); }).join("");
+      });
+    }
+    function authRequest(path, hwid) {
       var u = document.getElementById("auth-user").value.trim();
       var p = document.getElementById("auth-pass").value;
       if (!u || !p) { document.getElementById("auth-err").textContent = "Fill in both fields"; return; }
+      var payload = { username: u, password: p };
+      if (hwid) payload.hwid = hwid;
       fetch(SERVER + path, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: u, password: p })
+        body: JSON.stringify(payload)
       }).then(function(r) { return r.json(); }).then(function(d) {
         if (d.error) { document.getElementById("auth-err").textContent = d.error; return; }
         userToken = d.token;
@@ -314,7 +336,11 @@
       }).catch(function() { document.getElementById("auth-err").textContent = "Server offline"; });
     }
     function doLogin() { authRequest("/account/login"); }
-    function doSignup() { authRequest("/account/signup"); }
+    function doSignup() {
+      document.getElementById("auth-err").textContent = "Verifying device…";
+      deviceHwid().then(function(hwid) { authRequest("/account/signup", hwid); })
+        .catch(function() { authRequest("/account/signup", ""); });
+    }
     function doLogout() {
       userToken = ""; userName = "";
       localStorage.removeItem("rc_user_token");
