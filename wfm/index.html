@@ -107,12 +107,6 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
   border-bottom:7px solid #fff;border-top:none}
 
 /* ── extensions panel (MC options-screen style) ── */
-#extPanel{position:fixed;top:66px;z-index:25;display:none;flex-direction:column;gap:8px;width:220px;
-  background:rgba(0,0,0,.62);border:2px solid #000;padding:8px}
-#extPanel.open{display:flex}
-#extPanel h4{font-size:14px;font-weight:normal;text-align:center;padding-bottom:2px;text-shadow:2px 2px #3e3e3e}
-#extPanel .mcbtn{width:100%;font-size:14px}
-#extPanel .exthint{font-size:11px;color:#888;text-shadow:1px 1px #1a1a1a;line-height:1.35;padding:2px 2px 0}
 
 /* ── base finder ── */
 .basemark{position:relative}
@@ -228,6 +222,27 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 #creditsModal .crow span{font-size:12px;color:#bbb;text-shadow:1px 1px #1a1a1a}
 #creditsModal .crow a{color:#ffd98a;text-shadow:1px 1px #4a3410}
 #creditsModal .cbox .mcbtn{display:block;width:100%;margin-top:4px;font-size:14px}
+/* settings modal: left nav + content */
+#settingsModal{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.6)}
+#settingsModal.open{display:flex}
+#settingsModal .sbox{width:min(94vw,520px);height:min(82vh,360px);display:flex;image-rendering:pixelated;
+  background:linear-gradient(rgba(0,0,0,.5),rgba(0,0,0,.5)),url(dirt.png);background-size:auto,32px 32px;background-color:#3a2a1a;
+  border:2px solid #000;box-shadow:0 0 0 2px #4a4a4a,0 0 0 4px #000}
+#settingsModal .snav{width:132px;flex:none;background:rgba(0,0,0,.4);border-right:2px solid #000;
+  padding:12px 8px;display:flex;flex-direction:column;gap:6px}
+#settingsModal .stitle{font-size:16px;color:#fff;text-shadow:2px 2px #3e3e3e;text-align:center;margin-bottom:8px}
+#settingsModal .snavbtn{font-family:MC,monospace;font-size:14px;color:#fff;text-shadow:1px 1px #3e3e3e;cursor:pointer;
+  background:transparent;border:2px solid transparent;padding:6px 8px;text-align:left}
+#settingsModal .snavbtn:hover{background:rgba(255,255,255,.1)}
+#settingsModal .snavbtn.on{background:rgba(255,255,255,.16);border-color:#fff}
+#settingsModal .sbody{flex:1;min-width:0;padding:14px 16px;display:flex;flex-direction:column}
+#settingsModal .spane{flex:1;display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+#settingsModal .setrow{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  background:rgba(255,255,255,.06);border:1px solid #333;padding:8px 10px}
+#settingsModal .setlab{font-size:15px;color:#fff;text-shadow:1px 1px #3e3e3e}
+#settingsModal .setsub{font-size:11px;color:#aaa;text-shadow:1px 1px #1a1a1a;margin-top:2px;max-width:230px;line-height:1.3}
+#settingsModal .setrow .mcbtn{flex:none;min-width:56px;text-align:center}
+#settingsModal #setClose{width:100%;font-size:14px;margin-top:12px}
 
 /* ── dirt loading screen ── */
 #load{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -254,8 +269,8 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
   <div class=spacer></div>
   <div class=mcfield><span class=lab>X</span><input id=gotoX type=number placeholder=0></div>
   <div class=mcfield><span class=lab>Z</span><input id=gotoZ type=number placeholder=0></div>
-  <button class=mcbtn id=extbtn onclick=toggleExtPanel()>Extensions</button>
   <button class=mcbtn id=dbbtn onclick=toggleDbPanel()>2atabase</button>
+  <button class=mcbtn onclick=toggleSettings()>Settings</button>
   <button class=mcbtn onclick=refreshTiles()>Reload</button>
   <button class=mcbtn onclick=toggleSidebar()>List</button>
   <div class=online>
@@ -280,13 +295,6 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 </div>
 
 <div id=followNote onclick=stopFollow() title="Click to stop following">Following <span id=followName></span></div>
-
-<div id=extPanel>
-  <h4>Extensions</h4>
-  <button class=mcbtn data-ext=y onclick="toggleExt('y')">Y Axis: OFF</button>
-  <button class=mcbtn data-ext=heat onclick="toggleExt('heat')">Heatmap: OFF</button>
-  <button class=mcbtn onclick=startWpPlace()>Add Waypoint</button>
-</div>
 
 <div id=dbPanel>
   <h4>2atabase</h4>
@@ -324,6 +332,36 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
     <div class=crow><b>Baddy.crimson</b><span>Gave me the passion to make the map &mdash; check out his <a href="https://faction-heat-map.lovable.app/" target=_blank rel="noopener noreferrer">heat map</a></span></div>
     <div class=crow><b>M4/T4</b><span>Kinda ripped the name from him bec i like it &mdash; go to <a href="http://84.46.250.118:5000/4atabase" target=_blank rel="noopener noreferrer">84.46.250.118:5000/4atabase</a> to see the original</span></div>
     <button class=mcbtn onclick=toggleCredits()>Close</button>
+  </div>
+</div>
+
+<div id=settingsModal onclick="if(event.target===this)toggleSettings()">
+  <div class=sbox>
+    <div class=snav>
+      <div class=stitle>Settings</div>
+      <button class="snavbtn on" id=snavGeneral onclick="setSettingsTab('general')">General</button>
+    </div>
+    <div class=sbody>
+      <div class=spane id=paneGeneral>
+        <div class=setrow>
+          <div class=setlab>Follow<div class=setsub>Click a player to lock the camera onto them</div></div>
+          <button class=mcbtn id=setFollowBtn onclick=toggleFollowEnabled()>ON</button>
+        </div>
+        <div class=setrow>
+          <div class=setlab>Y Axis<div class=setsub>Show players' Y (height) coordinate</div></div>
+          <button class=mcbtn data-ext=y onclick="toggleExt('y')">OFF</button>
+        </div>
+        <div class=setrow>
+          <div class=setlab>Heatmap<div class=setsub>Live 10-second heat trail of player movement</div></div>
+          <button class=mcbtn data-ext=heat onclick="toggleExt('heat')">OFF</button>
+        </div>
+        <div class=setrow>
+          <div class=setlab>Waypoints<div class=setsub>Drop a personal marker on the map (right-click the map also works)</div></div>
+          <button class=mcbtn onclick=startWpPlace()>Add</button>
+        </div>
+      </div>
+      <button class=mcbtn id=setClose onclick=toggleSettings()>Close</button>
+    </div>
   </div>
 </div>
 
@@ -422,15 +460,14 @@ function refreshTiles() { cacheBuster = Date.now(); tileLayer.redraw(); }
 document.querySelectorAll('.mcfield input').forEach(i =>
   i.addEventListener('keydown', e => { if (e.key === 'Enter') goToCoords(); }));
 
-// ═══ Extensions ═══
+// ═══ Extensions (toggles live in Settings > General) ═══
 const ext = {
   y: localStorage.getItem('ext.y') === '1',       // Y axis off by default
   heat: localStorage.getItem('ext.heat') === '1', // Heatmap off by default
 };
 function syncExtButtons() {
-  document.querySelectorAll('#extPanel [data-ext]').forEach(b => {
-    const k = b.dataset.ext, on = !!ext[k];
-    b.textContent = b.textContent.replace(/: (ON|OFF)$/, `: ${on ? 'ON' : 'OFF'}`);
+  document.querySelectorAll('[data-ext]').forEach(b => {
+    b.textContent = ext[b.dataset.ext] ? 'ON' : 'OFF';
   });
 }
 function toggleExt(k) {
@@ -439,18 +476,29 @@ function toggleExt(k) {
   syncExtButtons();
   if (k === 'heat') ext.heat ? startHeatmap() : stopHeatmap();
 }
-function toggleExtPanel() {
-  const p = document.getElementById('extPanel');
-  const open = !p.classList.contains('open');
-  p.classList.toggle('open', open);
-  if (open) {
-    const r = document.getElementById('extbtn').getBoundingClientRect();
-    p.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 236)) + 'px';
-  }
-}
 syncExtButtons();
 
 function toggleCredits() { document.getElementById('creditsModal').classList.toggle('open'); }
+
+// ═══ Settings ═══
+function toggleSettings() { document.getElementById('settingsModal').classList.toggle('open'); }
+function setSettingsTab(t) {
+  document.getElementById('paneGeneral').style.display = t === 'general' ? 'flex' : 'none';
+  document.getElementById('snavGeneral').classList.toggle('on', t === 'general');
+}
+// General > Follow: when off, clicking a player no longer locks the camera
+let followEnabled = localStorage.getItem('followEnabled') !== '0';
+function syncFollowBtn() {
+  const b = document.getElementById('setFollowBtn');
+  if (b) b.textContent = followEnabled ? 'ON' : 'OFF';
+}
+function toggleFollowEnabled() {
+  followEnabled = !followEnabled;
+  localStorage.setItem('followEnabled', followEnabled ? '1' : '0');
+  if (!followEnabled) stopFollow();
+  syncFollowBtn();
+}
+syncFollowBtn();
 
 let sidebarOpen = true;
 function toggleSidebar() {
@@ -499,6 +547,7 @@ function markerIcon(p, selected) {
 }
 
 function setFollow(id, name) {
+  if (!followEnabled) return;              // Follow disabled in Settings
   followId = (followId === id) ? null : id;
   const note = document.getElementById('followNote');
   note.classList.toggle('on', !!followId);
@@ -689,11 +738,11 @@ function deleteWp() {
 function closeWpMenu() { wpMenuId = null; document.getElementById('wpMenu').classList.remove('open'); }
 renderWaypoints();
 
-// "Add Waypoint" from Extensions: arm place-mode, then the next map click drops one
+// "Add" waypoint from Settings > General: arm place-mode, then the next map click drops one
 let wpPlaceMode = false;
 function startWpPlace() {
   wpPlaceMode = true;
-  document.getElementById('extPanel').classList.remove('open');
+  document.getElementById('settingsModal').classList.remove('open');
   document.getElementById('wpBanner').classList.add('on');
   document.getElementById('map').style.cursor = 'crosshair';
 }
