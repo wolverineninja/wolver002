@@ -823,8 +823,10 @@ function selectBase(id) {
 // ═══ Sessions (per-join trails: kept until the player rejoins 3 times) ═══
 const SESS_API = 'https://admin.wolver002.com/factions/api/sessions';
 const SESS_COLORS = ['#9a9a9a', '#ff9a3b', '#ffff55'];   // oldest -> newest
-const SESS_SPEEDS = [['1x', .4], ['2x', .8], ['5x', 2], ['10x', 4], ['25x', 10], ['50x', 20]];   // label, trail points drawn per second
-let sessSpeedIdx = Math.min(SESS_SPEEDS.length - 1, +localStorage.getItem('sessSpeedIdx') || 0);
+const SESS_SPEEDS = [['0.5x', .2], ['1x', .4], ['2x', .8], ['5x', 2], ['10x', 4], ['25x', 10], ['50x', 20]];   // label, trail points drawn per second
+const SESS_DEFAULT_IDX = 3;   // 5x
+let sessSpeedIdx = SESS_DEFAULT_IDX;
+{ const _s = localStorage.getItem('sessSpeed'); if (_s !== null && SESS_SPEEDS[+_s]) sessSpeedIdx = +_s; }
 let sessTimer = null;
 let sessPlayers = [], sessSel = null, sessData = null, sessPlay = null;
 
@@ -952,8 +954,8 @@ function finishSessPlay() {
   advanceSessPlay();
 }
 function cycleSessSpeed() {
-  sessSpeedIdx = (sessSpeedIdx + 1) % SESS_SPEEDS.length;   // takes effect mid-draw too
-  localStorage.setItem('sessSpeedIdx', sessSpeedIdx);
+  sessSpeedIdx = (sessSpeedIdx - 1 + SESS_SPEEDS.length) % SESS_SPEEDS.length;   // click steps DOWN toward 0.5x; takes effect mid-draw too
+  localStorage.setItem('sessSpeed', sessSpeedIdx);
   const b = document.getElementById('sessSpeedBtn');
   if (b) b.textContent = SESS_SPEEDS[sessSpeedIdx][0];
 }
