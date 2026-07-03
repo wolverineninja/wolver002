@@ -757,18 +757,19 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && wpPlaceMod
 // trail: heat cools and vanishes 10s after a player leaves a spot ═══
 const HEAT_GRADIENT = { .1: '#0ea5e9', .3: '#22c55e', .55: '#eab308', .8: '#f97316', 1: '#dc2626' };
 const HEAT_TRAIL_MS = 10000;
-let heatLayer = null, heatPts = [];   // {t, lat, lng} samples from recent polls
+let heatLayer = null, heatPts = [];   // {t, name, x, y, z} samples from the last 10s of polls
 
 function heatTick() {
   const now = Date.now();
   for (const p of lastPlayers) {
     const pos = p.Pose?.Head?.Position; if (!pos) continue;
-    const ll = toLatLng(pos[0], pos[2]);
-    heatPts.push({ t: now, lat: ll[0], lng: ll[1] });
+    heatPts.push({ t: now, name: p.Username, x: pos[0], y: pos[1], z: pos[2] });
   }
   heatPts = heatPts.filter(q => now - q.t <= HEAT_TRAIL_MS);
-  if (heatLayer) heatLayer.setLatLngs(
-    heatPts.map(q => [q.lat, q.lng, Math.max(.15, 1 - (now - q.t) / HEAT_TRAIL_MS)]));
+  if (heatLayer) heatLayer.setLatLngs(heatPts.map(q => {
+    const ll = toLatLng(q.x, q.z);
+    return [ll[0], ll[1], Math.max(.15, 1 - (now - q.t) / HEAT_TRAIL_MS)];
+  }));
 }
 function startHeatmap() {
   if (!heatLayer) heatLayer = L.heatLayer([], {
@@ -779,12 +780,12 @@ function startHeatmap() {
 function stopHeatmap() { heatPts = []; if (heatLayer) { map.removeLayer(heatLayer); heatLayer = null; } closeAt(); }
 if (ext.heat) startHeatmap();
 
-// click a heated area (heatmap on) to see who's been there
-const AT_API = 'https://admin.wolver002.com/factions/api/at';
+// click a heated area (heatmap on) to see who's there right now — live, from the same
+// player feed as the glow, so nobody from "hours ago" (the server's 14-day history) shows up
 const fmtAgo = s => s < 60 ? s + 's ago' : s < 3600 ? Math.round(s / 60) + 'm ago' : s < 86400 ? Math.round(s / 3600) + 'h ago' : Math.round(s / 86400) + 'd ago';
 function closeAt() { document.getElementById('atPopup').classList.remove('open'); }
 
-map.on('click', async e => {
+map.on('click', e => {
   closeWpMenu();                           // clicking the map dismisses the waypoint menu
   if (wpPlaceMode) {                       // placing a waypoint takes priority
     cancelWpPlace();
@@ -792,27 +793,31 @@ map.on('click', async e => {
     return;
   }
   if (!ext.heat) return;
-  const x = Math.round(e.latlng.lng / UPB), z = Math.round(-e.latlng.lat / UPB);
+  const cx = e.latlng.lng / UPB, cz = -e.latlng.lat / UPB;
+  const R = 40, now = Date.now();            // blocks — roughly the heat glow's spread
+  const best = new Map();                     // name -> their most-recent nearby trail sample (last 10s)
+  for (const q of heatPts) {                  // heatPts = live trail, so nothing older than 10s
+    if (Math.hypot(q.x - cx, q.z - cz) > R) continue;
+    const prev = best.get(q.name);
+    if (!prev || q.t > prev.t) best.set(q.name, q);
+  }
+  const here = [...best.values()]
+    .map(q => ({ name: q.name, x: Math.round(q.x), y: Math.round(q.y), z: Math.round(q.z), secs: Math.round((now - q.t) / 1000) }))
+    .sort((a, b) => a.secs - b.secs);
   const panel = document.getElementById('atPopup');
-  document.getElementById('atTitle').textContent = 'Loading...';
-  document.getElementById('atList').innerHTML = '';
-  panel.classList.add('open');
   const pt = map.latLngToContainerPoint(e.latlng);
   panel.style.left = Math.max(8, Math.min(pt.x + 12, window.innerWidth - 244)) + 'px';
   panel.style.top = Math.max(60, Math.min(pt.y, window.innerHeight - 312)) + 'px';
-  let d;
-  try { d = await (await fetch(`${AT_API}?x=${x}&z=${z}&r=40`, { cache: 'no-store' })).json(); }
-  catch (_) { document.getElementById('atTitle').textContent = 'Connection error'; return; }
-  const players = d.players || [];
+  panel.classList.add('open');
   document.getElementById('atTitle').textContent =
-    players.length ? `${players.length} player${players.length === 1 ? '' : 's'} seen here` : 'No one tracked here';
-  document.getElementById('atList').innerHTML = players.map(p => `
+    here.length ? `${here.length} player${here.length === 1 ? '' : 's'} here now` : 'No one here right now';
+  document.getElementById('atList').innerHTML = here.map(p => `
     <div class=atit>
       <div class=nm>
-        <div class=u style="${adminStyle(p.username, 2)}">${escapeHtml(p.username)}</div>
+        <div class=u style="${adminStyle(p.name, 2)}">${escapeHtml(p.name)}</div>
         <div class=s>${p.x}, ${p.y}, ${p.z}</div>
       </div>
-      <div class=ago>${fmtAgo(p.ago)}</div>
+      <div class=ago>${p.secs}s ago</div>
     </div>`).join('');
 });
 
