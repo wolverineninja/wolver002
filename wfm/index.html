@@ -243,6 +243,10 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 #settingsModal .setsub{font-size:11px;color:#aaa;text-shadow:1px 1px #1a1a1a;margin-top:2px;max-width:230px;line-height:1.3}
 #settingsModal .setrow .mcbtn{flex:none;min-width:56px;text-align:center}
 #settingsModal #setClose{width:100%;font-size:14px;margin-top:12px}
+#settingsModal .setnum{flex:none;width:64px;font-family:MC,monospace;background:#000;border:2px solid #a0a0a0;color:#fff;
+  font-size:14px;padding:5px 6px;text-align:center;outline:0}
+#settingsModal .setnum:focus{border-color:#fff}
+#settingsModal .setnum::-webkit-outer-spin-button,#settingsModal .setnum::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 
 /* ── dirt loading screen ── */
 #load{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -339,10 +343,11 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
   <div class=sbox>
     <div class=snav>
       <div class=stitle>Settings</div>
-      <button class="snavbtn on" id=snavGeneral onclick="setSettingsTab('general')">General</button>
+      <button class="snavbtn on" data-tab=general onclick="setSettingsTab('general')">General</button>
+      <button class=snavbtn data-tab=heatmap onclick="setSettingsTab('heatmap')">Heatmap</button>
     </div>
     <div class=sbody>
-      <div class=spane id=paneGeneral>
+      <div class=spane id=paneGeneral data-tab=general>
         <div class=setrow>
           <div class=setlab>Follow<div class=setsub>Click a player to lock the camera onto them</div></div>
           <button class=mcbtn id=setFollowBtn onclick=toggleFollowEnabled()>ON</button>
@@ -352,12 +357,18 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
           <button class=mcbtn data-ext=y onclick="toggleExt('y')">OFF</button>
         </div>
         <div class=setrow>
-          <div class=setlab>Heatmap<div class=setsub>Live 10-second heat trail of player movement</div></div>
+          <div class=setlab>Waypoints<div class=setsub>Drop a personal marker on the map (right-click the map also works)</div></div>
+          <button class=mcbtn onclick=startWpPlace()>Add</button>
+        </div>
+      </div>
+      <div class=spane id=paneHeatmap data-tab=heatmap style=display:none>
+        <div class=setrow>
+          <div class=setlab>Heatmap<div class=setsub>Live heat trail of player movement</div></div>
           <button class=mcbtn data-ext=heat onclick="toggleExt('heat')">OFF</button>
         </div>
         <div class=setrow>
-          <div class=setlab>Waypoints<div class=setsub>Drop a personal marker on the map (right-click the map also works)</div></div>
-          <button class=mcbtn onclick=startWpPlace()>Add</button>
+          <div class=setlab>Trail length<div class=setsub>Seconds a player stays on the heatmap before fading</div></div>
+          <input id=heatTrailSecs class=setnum type=number min=1 max=600 step=1 value=10 onchange=setHeatTrail(this.value)>
         </div>
       </div>
       <button class=mcbtn id=setClose onclick=toggleSettings()>Close</button>
@@ -483,8 +494,8 @@ function toggleCredits() { document.getElementById('creditsModal').classList.tog
 // ═══ Settings ═══
 function toggleSettings() { document.getElementById('settingsModal').classList.toggle('open'); }
 function setSettingsTab(t) {
-  document.getElementById('paneGeneral').style.display = t === 'general' ? 'flex' : 'none';
-  document.getElementById('snavGeneral').classList.toggle('on', t === 'general');
+  document.querySelectorAll('#settingsModal .spane').forEach(p => p.style.display = p.dataset.tab === t ? 'flex' : 'none');
+  document.querySelectorAll('#settingsModal .snavbtn').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
 }
 // General > Follow: when off, clicking a player no longer locks the camera
 let followEnabled = localStorage.getItem('followEnabled') !== '0';
@@ -753,11 +764,20 @@ function cancelWpPlace() {
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && wpPlaceMode) cancelWpPlace(); });
 
-// ═══ Heatmap — crimson-style glow under live players, with a strict 10-second
-// trail: heat cools and vanishes 10s after a player leaves a spot ═══
+// ═══ Heatmap — crimson-style glow under live players, with a trail: heat cools and
+// vanishes HEAT_TRAIL_MS after a player leaves a spot (duration set in Settings) ═══
 const HEAT_GRADIENT = { .1: '#0ea5e9', .3: '#22c55e', .55: '#eab308', .8: '#f97316', 1: '#dc2626' };
-const HEAT_TRAIL_MS = 10000;
-let heatLayer = null, heatPts = [];   // {t, name, x, y, z} samples from the last 10s of polls
+let HEAT_TRAIL_MS = Math.max(1000, (+localStorage.getItem('heatTrailSecs') || 10) * 1000);
+let heatLayer = null, heatPts = [];   // {t, name, x, y, z} samples within the trail window
+// set from the "Heatmap trail" number field in Settings > General
+function setHeatTrail(secs) {
+  secs = Math.max(1, Math.min(600, Math.round(+secs) || 10));
+  HEAT_TRAIL_MS = secs * 1000;
+  localStorage.setItem('heatTrailSecs', secs);
+  document.getElementById('heatTrailSecs').value = secs;   // reflect clamping
+  if (ext.heat) heatTick();                                 // apply immediately
+}
+document.getElementById('heatTrailSecs').value = HEAT_TRAIL_MS / 1000;   // reflect persisted value
 
 function heatTick() {
   const now = Date.now();
