@@ -247,6 +247,42 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
   font-size:14px;padding:5px 6px;text-align:center;outline:0}
 #settingsModal .setnum:focus{border-color:#fff}
 #settingsModal .setnum::-webkit-outer-spin-button,#settingsModal .setnum::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+/* waypoints tab: filters divider + filter tabs */
+.wpfhead{display:flex;align-items:center;gap:10px;margin:14px 0 8px}
+.wpfdiv{flex:1;font-size:12px;color:#aaa;text-shadow:1px 1px #1a1a1a;text-transform:uppercase;letter-spacing:.1em;
+  border-bottom:1px solid #444;padding-bottom:4px}
+#wpLoginBtn{flex:none;font-size:13px;padding:5px 12px 7px}
+#wpLoginBtn .uname{color:#4ade80}
+.wpftabs{display:flex;gap:6px;margin-bottom:8px}
+.wpftabs .mcbtn{flex:1;font-size:13px;padding:5px 6px 7px}
+.wpftabs .mcbtn.on{background:#7c81b8;border-color:#fff}
+.wpnotice{font-size:11px;color:#ffcf5c;text-shadow:1px 1px #000;background:rgba(255,180,40,.12);
+  border:1px solid rgba(255,180,40,.35);padding:8px 9px;margin-top:8px;line-height:1.4}
+.wpnotice .wpack{display:block;width:100%;margin-top:9px;font-size:13px;padding:5px 10px 7px}
+/* MC-styled account modal */
+#authModal{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.6)}
+#authModal.open{display:flex}
+#authModal .abox{width:min(92vw,320px);background:rgba(12,12,12,.97);border:2px solid #000;
+  box-shadow:0 0 0 2px #4a4a4a,0 0 0 4px #000;padding:16px 18px 18px}
+#authModal h4{font-size:16px;text-align:center;color:#fff;text-shadow:2px 2px #3e3e3e;margin-bottom:10px}
+#authModal .anote{font-size:11px;color:#ffcf5c;text-shadow:1px 1px #000;background:rgba(255,180,40,.12);
+  border:1px solid rgba(255,180,40,.35);padding:7px 8px;margin-bottom:12px;line-height:1.35;text-align:center}
+#authModal .ainput{width:100%;font-family:MC,monospace;background:#000;border:2px solid #a0a0a0;color:#fff;font-size:14px;
+  padding:7px 9px;margin-bottom:9px;outline:0}
+#authModal .ainput:focus{border-color:#fff}
+#authModal .abtns{display:flex;gap:8px;margin-top:2px}
+#authModal .abtns .mcbtn{flex:1;font-size:14px}
+#authModal .aerr{color:#ff6b6b;font-size:12px;margin-top:9px;min-height:15px;text-shadow:1px 1px #1a1a1a}
+/* community-waypoints acknowledgment popup */
+#wpAckModal{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.62)}
+#wpAckModal.open{display:flex}
+#wpAckModal .wpackbox{width:min(92vw,350px);background:rgba(12,12,12,.97);border:2px solid #000;
+  box-shadow:0 0 0 2px #4a4a4a,0 0 0 4px #000;padding:16px 18px 18px;text-align:center}
+#wpAckModal h4{font-size:16px;color:#fff;text-shadow:2px 2px #3e3e3e;margin-bottom:12px}
+#wpAckModal .wpackmsg{font-size:12px;color:#ffcf5c;text-shadow:1px 1px #000;background:rgba(255,180,40,.12);
+  border:1px solid rgba(255,180,40,.35);padding:11px;margin-bottom:14px;line-height:1.45}
+#wpAckModal .wpackbtns{display:flex;gap:8px}
+#wpAckModal .wpackbtns .mcbtn{flex:1;font-size:14px}
 
 /* ── dirt loading screen ── */
 #load{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -344,6 +380,7 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
     <div class=snav>
       <div class=stitle>Settings</div>
       <button class="snavbtn on" data-tab=general onclick="setSettingsTab('general')">General</button>
+      <button class=snavbtn data-tab=waypoints onclick="setSettingsTab('waypoints')">Waypoints</button>
       <button class=snavbtn data-tab=heatmap onclick="setSettingsTab('heatmap')">Heatmap</button>
     </div>
     <div class=sbody>
@@ -356,10 +393,19 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
           <div class=setlab>Y Axis<div class=setsub>Show players' Y (height) coordinate</div></div>
           <button class=mcbtn data-ext=y onclick="toggleExt('y')">OFF</button>
         </div>
+      </div>
+      <div class=spane id=paneWaypoints data-tab=waypoints style=display:none>
         <div class=setrow>
-          <div class=setlab>Waypoints<div class=setsub>Drop a personal marker on the map (right-click the map also works)</div></div>
+          <div class=setlab>Add waypoint<div class=setsub>Drop a marker on the map (right-click the map also works)</div></div>
           <button class=mcbtn onclick=startWpPlace()>Add</button>
         </div>
+        <div class=wpfhead><span class=wpfdiv>Filters</span><button class=mcbtn id=wpLoginBtn onclick=openAuth()>Log In</button></div>
+        <div class=wpftabs>
+          <button class="mcbtn on" data-wpf=personal onclick="setWpFilter('personal')">Personal</button>
+          <button class=mcbtn data-wpf=community onclick="setWpFilter('community')">Community</button>
+          <button class=mcbtn data-wpf=trusted onclick="setWpFilter('trusted')">Trusted</button>
+        </div>
+        <div id=wpNotice class=wpnotice style=display:none></div>
       </div>
       <div class=spane id=paneHeatmap data-tab=heatmap style=display:none>
         <div class=setrow>
@@ -372,6 +418,31 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
         </div>
       </div>
       <button class=mcbtn id=setClose onclick=toggleSettings()>Close</button>
+    </div>
+  </div>
+</div>
+
+<div id=authModal onclick="if(event.target===this)closeAuth()">
+  <div class=abox>
+    <h4>Account</h4>
+    <div class=anote>&#9888; YOU CAN'T CHANGE YOUR USERNAME &mdash; CHOOSE IT WISELY</div>
+    <input id=authUser class=ainput placeholder=Username autocomplete=off spellcheck=false>
+    <input id=authPass class=ainput type=password placeholder=Password autocomplete=off>
+    <div class=abtns>
+      <button class=mcbtn onclick=doSignup()>Sign Up</button>
+      <button class=mcbtn onclick=doLogin()>Log In</button>
+    </div>
+    <div class=aerr id=authErr></div>
+  </div>
+</div>
+
+<div id=wpAckModal onclick="if(event.target===this)wpAckCancel()">
+  <div class=wpackbox>
+    <h4>Community Waypoints</h4>
+    <div class=wpackmsg>&#9888; I'm not responsible for anything you see here &mdash; these are purely waypoints made by the community.</div>
+    <div class=wpackbtns>
+      <button class=mcbtn onclick=wpAckCancel()>Cancel</button>
+      <button class=mcbtn onclick=ackCommunity()>I Understand</button>
     </div>
   </div>
 </div>
@@ -496,7 +567,121 @@ function toggleSettings() { document.getElementById('settingsModal').classList.t
 function setSettingsTab(t) {
   document.querySelectorAll('#settingsModal .spane').forEach(p => p.style.display = p.dataset.tab === t ? 'flex' : 'none');
   document.querySelectorAll('#settingsModal .snavbtn').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  if (t === 'waypoints') renderWpFilter();   // refresh the personal count etc.
 }
+
+// ═══ Account (universal login, shared with the rest of the site via localStorage) ═══
+const AUTH_SERVER = 'https://admin.wolver002.com';
+let userToken = localStorage.getItem('rc_user_token') || '';
+let userName = localStorage.getItem('rc_user_name') || '';
+function deviceHwid() {
+  const parts = [navigator.userAgent||'', navigator.language||'', navigator.platform||'',
+    (navigator.hardwareConcurrency||'')+'', (navigator.deviceMemory||'')+'',
+    screen.width+'x'+screen.height+'x'+screen.colorDepth,
+    (()=>{ try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch(e){ return ''; } })()];
+  try {
+    const cv = document.createElement('canvas'), ctx = cv.getContext('2d');
+    ctx.textBaseline='top'; ctx.font='14px Arial'; ctx.fillStyle='#f60'; ctx.fillRect(0,0,100,20);
+    ctx.fillStyle='#069'; ctx.fillText('wolver-hwid',2,2); parts.push(cv.toDataURL());
+  } catch(e) {}
+  return crypto.subtle.digest('SHA-256', new TextEncoder().encode(parts.join('|')))
+    .then(buf => Array.from(new Uint8Array(buf)).map(b => ('0'+b.toString(16)).slice(-2)).join(''));
+}
+function updateAuthBtn() {
+  const b = document.getElementById('wpLoginBtn');
+  if (userToken && userName) { b.innerHTML = '<span class=uname>'+escapeHtml(userName)+'</span> &middot; Log Out'; b.onclick = doLogout; }
+  else { b.textContent = 'Log In'; b.onclick = openAuth; }
+}
+function openAuth() {
+  document.getElementById('authErr').textContent = '';
+  document.getElementById('authUser').value = ''; document.getElementById('authPass').value = '';
+  document.getElementById('authModal').classList.add('open');
+  setTimeout(() => document.getElementById('authUser').focus(), 80);
+}
+function closeAuth() { document.getElementById('authModal').classList.remove('open'); }
+function authRequest(path, hwid) {
+  const u = document.getElementById('authUser').value.trim(), p = document.getElementById('authPass').value;
+  if (!u || !p) { document.getElementById('authErr').textContent = 'Fill in both fields'; return; }
+  const payload = { username: u, password: p }; if (hwid) payload.hwid = hwid;
+  fetch(AUTH_SERVER + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    .then(r => r.json()).then(d => {
+      if (d.error) { document.getElementById('authErr').textContent = d.error; return; }
+      userToken = d.token; userName = d.username;
+      localStorage.setItem('rc_user_token', userToken); localStorage.setItem('rc_user_name', userName);
+      closeAuth(); updateAuthBtn(); renderWpFilter();
+    }).catch(() => { document.getElementById('authErr').textContent = 'Server offline'; });
+}
+function doLogin() { authRequest('/account/login'); }
+function doSignup() {
+  document.getElementById('authErr').textContent = 'Verifying device…';
+  deviceHwid().then(h => authRequest('/account/signup', h)).catch(() => authRequest('/account/signup', ''));
+}
+function doLogout() {
+  userToken = ''; userName = '';
+  localStorage.removeItem('rc_user_token'); localStorage.removeItem('rc_user_name');
+  updateAuthBtn(); renderWpFilter();
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAuth(); });
+window.addEventListener('storage', e => {
+  if (e.key === 'rc_user_token' || e.key === 'rc_user_name') {
+    userToken = localStorage.getItem('rc_user_token') || ''; userName = localStorage.getItem('rc_user_name') || '';
+    updateAuthBtn(); renderWpFilter();
+  }
+});
+
+// ═══ Waypoint filters (Personal default / Community / Admin) ═══
+let wpFilter = 'personal';
+function setWpFilter(f) {
+  wpFilter = f;
+  document.querySelectorAll('.wpftabs [data-wpf]').forEach(b => b.classList.toggle('on', b.dataset.wpf === f));
+  renderWpFilter();
+  if (f === 'community' && localStorage.getItem('wpCommunityAck2') !== '1') openWpAck();
+}
+function renderWpFilter() {
+  // filters just control which waypoints show on the map (no descriptions)
+  if (wpFilter === 'personal') wpLayer.addTo(map); else map.removeLayer(wpLayer);
+  const note = document.getElementById('wpNotice');
+  if (note) {
+    if (wpFilter === 'community') {
+      note.textContent = "⚠ These are purely waypoints made by the community — not my responsibility.";
+      note.style.display = 'block';
+    } else { note.style.display = 'none'; }
+  }
+  // Phase 2: community waypoints only display once acknowledged (localStorage wpCommunityAck2)
+}
+function openWpAck() { document.getElementById('wpAckModal').classList.add('open'); }
+function wpAckCancel() { document.getElementById('wpAckModal').classList.remove('open'); setWpFilter('personal'); }
+function ackCommunity() { localStorage.setItem('wpCommunityAck2', '1'); document.getElementById('wpAckModal').classList.remove('open'); }
+updateAuthBtn();   // default filter 'personal' + wpLayer already on the map = correct initial state
+
+// Minecraft button-click sound — Web Audio for near-zero latency (decode once, play instantly),
+// fired on pointerdown (press), not click (press+release), and skipping any soft lead-in.
+let _actx = null, _clickBuf = null, _clickOffset = 0;
+try {
+  _actx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
+  fetch('click.mp3').then(r => r.arrayBuffer()).then(a => _actx.decodeAudioData(a)).then(buf => {
+    _clickBuf = buf;
+    const ch = buf.getChannelData(0);
+    let max = 0; for (let i = 0; i < ch.length; i++) { const a2 = Math.abs(ch[i]); if (a2 > max) max = a2; }
+    const thr = Math.max(0.02, max * 0.2);          // jump straight to the transient (20% of peak)
+    for (let i = 0; i < ch.length; i++) {
+      if (Math.abs(ch[i]) > thr) { _clickOffset = Math.max(0, i / buf.sampleRate - 0.001); break; }
+    }
+  }).catch(() => {});
+} catch (_) {}
+// warm the context on the first gesture so the first press has no resume lag
+window.addEventListener('pointerdown', function _warm() {
+  if (_actx && _actx.state === 'suspended') _actx.resume();
+  window.removeEventListener('pointerdown', _warm, true);
+}, true);
+document.addEventListener('pointerdown', e => {
+  if (!e.target.closest('.mcbtn, .snavbtn') || !_actx || !_clickBuf) return;
+  if (_actx.state === 'suspended') _actx.resume();
+  const src = _actx.createBufferSource(); src.buffer = _clickBuf;
+  const g = _actx.createGain(); g.gain.value = 0.5;
+  src.connect(g).connect(_actx.destination);
+  src.start(0, _clickOffset);
+}, true);
 // General > Follow: when off, clicking a player no longer locks the camera
 let followEnabled = localStorage.getItem('followEnabled') !== '0';
 function syncFollowBtn() {
@@ -520,6 +705,7 @@ function toggleSidebar() {
 // ═══ Players ═══
 const markers = new Map();   // id -> {marker, skin}
 const playersLayer = L.layerGroup().addTo(map);   // all player markers live here so the eye icon can hide them
+const wpLayer = L.layerGroup().addTo(map);        // personal waypoint markers — toggled by the Waypoints filter
 let followId = null;
 let lastPlayers = [];
 
@@ -702,11 +888,11 @@ function wpIcon(w) {
 }
 function renderWaypoints() {
   const ids = new Set(waypoints.map(w => w.id));
-  for (const [id, m] of wpMarkers) if (!ids.has(id)) { map.removeLayer(m); wpMarkers.delete(id); }
+  for (const [id, m] of wpMarkers) if (!ids.has(id)) { wpLayer.removeLayer(m); wpMarkers.delete(id); }
   for (const w of waypoints) {
     let m = wpMarkers.get(w.id);
     if (!m) {
-      m = L.marker(toLatLng(w.x, w.z), { icon: wpIcon(w), zIndexOffset: 2000 }).addTo(map);
+      m = L.marker(toLatLng(w.x, w.z), { icon: wpIcon(w), zIndexOffset: 2000 }).addTo(wpLayer);
       m.on('click', () => openWpMenu(w.id));
       wpMarkers.set(w.id, m);
     } else { m.setLatLng(toLatLng(w.x, w.z)); m.setIcon(wpIcon(w)); }

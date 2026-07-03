@@ -306,6 +306,8 @@
     .auth-btns .btn-li { background: var(--green); color: #000; }
     .auth-btns .btn-li:hover { opacity: 0.85; }
     .auth-err { color: var(--red); font-size: 12px; margin-top: 10px; min-height: 16px; }
+    .auth-note { color: #ffcf5c; font-size: 11px; font-weight: 600; margin-bottom: 12px; background: rgba(255,180,40,0.1);
+      border: 1px solid rgba(255,180,40,0.3); border-radius: 6px; padding: 8px 10px; line-height: 1.35; }
   </style>
 </head>
 <body>
@@ -315,6 +317,7 @@
     <div class="auth-modal" id="auth-modal">
       <div class="auth-box">
         <h2>Log In</h2>
+        <div class="auth-note">⚠ YOU CAN'T CHANGE YOUR USERNAME — CHOOSE IT WISELY</div>
         <input type="text" id="auth-user" placeholder="Username" autocomplete="off" />
         <input type="password" id="auth-pass" placeholder="Password" autocomplete="off" />
         <div class="auth-btns">
