@@ -37,13 +37,6 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 #coords{position:fixed;left:12px;bottom:12px;z-index:15;background:rgba(0,0,0,.62);
   border:2px solid #000;padding:6px 10px 8px;font-size:14px}
 
-.bmarker{position:relative}
-.bmarker .flag{position:absolute;left:50%;top:50%;width:12px;height:12px;transform:translate(-50%,-50%) rotate(45deg);
-  background:#f5c542;box-shadow:0 0 0 2px #000}
-.bmarker .bname{position:absolute;left:50%;top:14px;transform:translateX(-50%);white-space:nowrap;
-  font-family:MC,monospace;font-size:12px;color:#fff;text-shadow:1px 1px #3e3e3e;
-  background:rgba(0,0,0,.5);padding:1px 4px 2px;pointer-events:none}
-body.noBases .bmarker{display:none}
 </style>
 </head>
 <body>
@@ -55,7 +48,6 @@ body.noBases .bmarker{display:none}
     <div class="sub yellow">WORLD ARCHIVE &middot; July 3, 2026 (pre-reset)</div>
   </div>
   <div class=spacer></div>
-  <button class=mcbtn id=basesBtn onclick=toggleBases()>Bases: ON</button>
   <button class=mcbtn onclick="location.href='../'">Live Map</button>
 </div>
 
@@ -114,29 +106,6 @@ new L.GridLayer.Archive({
   tileSize: TILE_SIZE, noWrap: true, keepBuffer: 8,
   updateWhenZooming: false, updateWhenIdle: false
 }).addTo(map);
-
-// ═══ Archived bases overlay ═══
-let basesOn = localStorage.getItem('archBasesOn') !== '0';
-function applyBases() {
-  document.body.classList.toggle('noBases', !basesOn);
-  document.getElementById('basesBtn').textContent = 'Bases: ' + (basesOn ? 'ON' : 'OFF');
-}
-function toggleBases() {
-  basesOn = !basesOn;
-  localStorage.setItem('archBasesOn', basesOn ? '1' : '0');
-  applyBases();
-}
-applyBases();
-
-fetch(`${ARCHIVE}/bases.json`).then(r => r.json()).then(d => {
-  (d.bases || []).forEach(b => {
-    const icon = L.divIcon({
-      className: 'bmarker', iconSize: [0, 0],
-      html: `<div class=flag></div><div class=bname>${String(b.username).replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</div>`
-    });
-    L.marker(toLatLng(b.x, b.z), { icon, interactive: false }).addTo(map);
-  });
-}).catch(() => {});
 
 // ═══ Cursor coordinates ═══
 map.on('mousemove', e => {
