@@ -103,7 +103,9 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 .pmarker.sel .mhead{box-shadow:0 0 0 2px #fff}
 .pmarker.sel .mname{color:#ffff55;text-shadow:2px 2px #3e3e15}
 .pmarker .arrow{position:absolute;left:-6px;top:-27px;width:12px;height:12px;pointer-events:none;transform-origin:6px 27px;
-  filter:drop-shadow(1px 1px 0 #000)}
+  filter:drop-shadow(1px 1px 0 #000);z-index:2}   /* above the nametag so it shows when facing south */
+body.noNames .pmarker .mname{display:none}
+body.noArrows .pmarker .arrow{display:none}
 .pmarker .arrow::before{content:"";position:absolute;left:2px;top:1px;border:4px solid transparent;
   border-bottom:7px solid #fff;border-top:none}
 
@@ -153,6 +155,13 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 .sessit .t .s2{font-size:11px;color:#aaa;display:block}
 .sessctl{display:flex;gap:6px;padding:5px 7px 6px 16px;background:rgba(255,255,255,.05)}
 .sessctl .mcbtn{font-size:12px;padding:3px 10px 5px;flex:1}
+/* session replay speed dropdown */
+#spdMenu{position:fixed;z-index:40;display:none;width:88px;background:rgba(12,12,12,.96);border:2px solid #000;
+  box-shadow:0 0 0 2px #4a4a4a;padding:4px}
+#spdMenu.open{display:block}
+.spdopt{font-family:MC,monospace;font-size:13px;color:#fff;text-shadow:1px 1px #3e3e3e;padding:4px 9px 5px;cursor:pointer}
+.spdopt:hover{background:rgba(255,255,255,.18)}
+.spdopt.on{color:#ffff55;text-shadow:1px 1px #3e3e15}
 /* sessions saved in this browser */
 .sesshead{font-size:10px;color:#8fd6de;text-shadow:1px 1px #04222a;text-transform:uppercase;letter-spacing:.09em;padding:7px 2px 3px}
 .sessit .sx{flex:none;cursor:pointer;color:#888;padding:0 4px;font-size:13px;line-height:1}
@@ -381,6 +390,7 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
   <div id=cwpmInfo></div>
   <button class=mcbtn id=cwpDelBtn onclick=deleteCwp()>Delete</button>
 </div>
+<div id=spdMenu></div>
 <div id=atPopup>
   <div class=at-head><span id=atTitle></span><span class=stop onclick=closeAt()>x</span></div>
   <div id=atList></div>
@@ -418,6 +428,14 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
           <div class=setlab>Click sound<div class=setsub>Play the button click sound when pressing buttons</div></div>
           <button class=mcbtn id=setClickBtn onclick=toggleClickSound()>ON</button>
         </div>
+        <div class=setrow>
+          <div class=setlab>Nametags<div class=setsub>Show player names under their head on the map</div></div>
+          <button class=mcbtn id=setNamesBtn onclick=toggleNames()>ON</button>
+        </div>
+        <div class=setrow>
+          <div class=setlab>Arrows<div class=setsub>Show the direction arrow players are facing</div></div>
+          <button class=mcbtn id=setArrowsBtn onclick=toggleArrows()>ON</button>
+        </div>
       </div>
       <div class=spane id=paneWaypoints data-tab=waypoints style=display:none>
         <div class=setrow>
@@ -439,7 +457,7 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
         </div>
         <div class=setrow>
           <div class=setlab>Trail length<div class=setsub>Seconds a player stays on the heatmap before fading</div></div>
-          <input id=heatTrailSecs class=setnum type=number min=1 max=600 step=1 value=10 onchange=setHeatTrail(this.value)>
+          <input id=heatTrailSecs class=setnum type=number min=1 step=1 value=10 onchange=setHeatTrail(this.value)>
         </div>
       </div>
       <button class=mcbtn id=setClose onclick=toggleSettings()>Close</button>
@@ -769,7 +787,7 @@ function toggleClickSound() {
 }
 syncClickBtn();
 document.addEventListener('pointerdown', e => {
-  if (!clickSoundOn || !e.target.closest('.mcbtn, .snavbtn') || !_actx || !_clickBuf) return;
+  if (!clickSoundOn || !e.target.closest('.mcbtn, .snavbtn, .spdopt') || !_actx || !_clickBuf) return;
   if (_actx.state === 'suspended') _actx.resume();
   const src = _actx.createBufferSource(); src.buffer = _clickBuf;
   const g = _actx.createGain(); g.gain.value = 0.5;
@@ -789,6 +807,19 @@ function toggleFollowEnabled() {
   syncFollowBtn();
 }
 syncFollowBtn();
+
+// General > Nametags / Arrows: hide the labels or heading arrows on player markers (persisted)
+let namesOn = localStorage.getItem('nametags') !== '0';
+let arrowsOn = localStorage.getItem('arrows') !== '0';
+function applyNameArrow() {
+  document.body.classList.toggle('noNames', !namesOn);
+  document.body.classList.toggle('noArrows', !arrowsOn);
+  const nb = document.getElementById('setNamesBtn'); if (nb) nb.textContent = namesOn ? 'ON' : 'OFF';
+  const ab = document.getElementById('setArrowsBtn'); if (ab) ab.textContent = arrowsOn ? 'ON' : 'OFF';
+}
+function toggleNames() { namesOn = !namesOn; localStorage.setItem('nametags', namesOn ? '1' : '0'); applyNameArrow(); }
+function toggleArrows() { arrowsOn = !arrowsOn; localStorage.setItem('arrows', arrowsOn ? '1' : '0'); applyNameArrow(); }
+applyNameArrow();
 
 let sidebarOpen = true;
 function toggleSidebar() {
@@ -832,7 +863,7 @@ function markerIcon(p, selected) {
   return L.divIcon({
     className: '', iconSize: [0, 0],
     html: `<div class="pmarker${selected ? ' sel' : ''}">
-      <div class=arrow style="transform:rotate(${-heading}deg)"></div>
+      <div class=arrow style="transform:rotate(${heading + 180}deg)"></div>
       <div class=mhead>${headHtml(p.SkinId)}</div>
       <div class=mname style="${adminStyle(p.Username, 1)}">${escapeHtml(p.Username || '?')}</div>
     </div>`
@@ -874,7 +905,7 @@ function updateMarkers(players) {
       e.marker.setLatLng(ll);
       const root = e.marker.getElement()?.querySelector('.pmarker');
       if (root) {
-        root.querySelector('.arrow').style.transform = `rotate(${-(p.Pose?.Heading ?? 0)}deg)`;
+        root.querySelector('.arrow').style.transform = `rotate(${(p.Pose?.Heading ?? 0) + 180}deg)`;
         if (e.skin !== p.SkinId) {
           e.skin = p.SkinId;
           root.querySelectorAll('.face,.hat').forEach(d => d.style.backgroundImage = `url('${skinUrl(p.SkinId)}')`);
@@ -1059,7 +1090,7 @@ let HEAT_TRAIL_MS = Math.max(1000, (+localStorage.getItem('heatTrailSecs') || 10
 let heatLayer = null, heatPts = [];   // {t, name, x, y, z} samples within the trail window
 // set from the "Heatmap trail" number field in Settings > General
 function setHeatTrail(secs) {
-  secs = Math.max(1, Math.min(600, Math.round(+secs) || 10));
+  secs = Math.max(1, Math.round(+secs) || 10);
   HEAT_TRAIL_MS = secs * 1000;
   localStorage.setItem('heatTrailSecs', secs);
   document.getElementById('heatTrailSecs').value = secs;   // reflect clamping
@@ -1229,7 +1260,7 @@ function sessCtlHtml(saveState) {   // saveState: null = no save button, 'save' 
   return `
   <div class=sessctl>
     <button class=mcbtn onclick=rewindSessPlay()>Rewind</button>
-    <button class=mcbtn id=sessSpeedBtn onclick=cycleSessSpeed() title="Replay speed">${SESS_SPEEDS[sessSpeedIdx][0]}</button>
+    <button class=mcbtn id=sessSpeedBtn onclick=openSpeedMenu() title="Replay speed">${SESS_SPEEDS[sessSpeedIdx][0]}</button>
     <button class=mcbtn onclick=finishSessPlay()>Finish</button>` +
     (saveState === 'save' ? `<button class=mcbtn onclick=saveCurSession() title="Keep this session on your device">Save</button>` :
      saveState === 'saved' ? `<button class=mcbtn style="opacity:.55;pointer-events:none">Saved</button>` : '') + `
@@ -1237,6 +1268,7 @@ function sessCtlHtml(saveState) {   // saveState: null = no save button, 'save' 
 }
 
 function renderSessList() {
+  closeSpeedMenu();                    // re-render can move the speed button out from under it
   const list = document.getElementById('sessList');
   const q = (document.getElementById('sessSearch').value || '').trim().toLowerCase();
   const now = Math.floor(Date.now() / 1000);
@@ -1359,6 +1391,7 @@ function saveCurSession() {
   renderSessList();
 }
 function deleteSavedSession(id) {
+  if (!confirm('This will permanently delete this saved session. Are you sure you want to do this?')) return;
   savedSess = savedSess.filter(x => x.id !== id);
   localStorage.setItem('savedSessions', JSON.stringify(savedSess));
   if (sessPlay && sessPlay.idx === 'sv:' + id) clearSessPlay();
@@ -1403,12 +1436,31 @@ function finishSessPlay() {
   p.dir = 1; p.prog = p.lls.length;
   advanceSessPlay();
 }
-function cycleSessSpeed() {
-  sessSpeedIdx = (sessSpeedIdx - 1 + SESS_SPEEDS.length) % SESS_SPEEDS.length;   // click steps DOWN toward 0.5x; takes effect mid-draw too
-  localStorage.setItem('sessSpeed', sessSpeedIdx);
-  const b = document.getElementById('sessSpeedBtn');
-  if (b) b.textContent = SESS_SPEEDS[sessSpeedIdx][0];
+// speed button -> dropdown of all speeds; picking one takes effect mid-draw too
+function openSpeedMenu() {
+  const b = document.getElementById('sessSpeedBtn'); if (!b) return;
+  const el = document.getElementById('spdMenu');
+  if (el.classList.contains('open')) { closeSpeedMenu(); return; }
+  el.innerHTML = SESS_SPEEDS.map(([lab], i) =>
+    `<div class="spdopt${i === sessSpeedIdx ? ' on' : ''}" onclick="setSessSpeed(${i})">${lab}</div>`).join('');
+  el.classList.add('open');
+  const r = b.getBoundingClientRect(), h = el.offsetHeight;
+  el.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 100)) + 'px';
+  el.style.top = (r.top - h - 4 > 58 ? r.top - h - 4 : r.bottom + 4) + 'px';   // above the button, below if cramped
 }
+function setSessSpeed(i) {
+  if (!SESS_SPEEDS[i]) return;
+  sessSpeedIdx = i;
+  localStorage.setItem('sessSpeed', i);
+  const b = document.getElementById('sessSpeedBtn');
+  if (b) b.textContent = SESS_SPEEDS[i][0];
+  closeSpeedMenu();
+}
+function closeSpeedMenu() { document.getElementById('spdMenu').classList.remove('open'); }
+document.addEventListener('click', e => {
+  if (!e.target.closest('#spdMenu') && e.target.id !== 'sessSpeedBtn') closeSpeedMenu();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSpeedMenu(); });
 function clearSessPlay() {
   const p = sessPlay; if (!p) return;
   clearInterval(p.timer); clearInterval(p.refresh);
