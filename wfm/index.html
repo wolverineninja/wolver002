@@ -56,6 +56,9 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 #sideHead{position:relative;flex:none}
 #plSearchBtn{position:absolute;right:0;top:-2px;padding:2px 4px 3px;font-size:0;line-height:0}
 #plSearchBtn svg{display:block;shape-rendering:crispEdges;filter:drop-shadow(2px 2px 0 #3e3e3e)}
+#plEyeBtn{position:absolute;left:0;top:-2px;padding:2px 4px 3px;font-size:0;line-height:0}
+#plEyeBtn svg{display:block;shape-rendering:crispEdges;filter:drop-shadow(2px 2px 0 #3e3e3e)}
+#plEyeBtn.off svg{opacity:.5}
 #plSearch{display:none;font-family:MC,monospace;background:#000;border:2px solid #a0a0a0;color:#fff;font-size:14px;
   padding:6px 8px;margin-bottom:7px;outline:0;flex:none}
 #side.searching #plSearch{display:block}
@@ -263,6 +266,7 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 
 <div id=side>
   <div id=sideHead>
+    <button id=plEyeBtn class=mcbtn onclick=togglePlayers() title="Hide players on map"></button>
     <h4 id=playerCount>Players</h4>
     <button id=plSearchBtn class=mcbtn onclick=togglePlSearch() title="Search players"><svg width="18" height="18" viewBox="0 0 10 10" fill="#fff" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="1" width="4" height="1"/><rect x="1" y="2" width="1" height="4"/><rect x="6" y="2" width="1" height="4"/><rect x="2" y="6" width="4" height="1"/><rect x="6" y="6" width="1" height="1"/><rect x="7" y="7" width="1" height="1"/><rect x="8" y="8" width="1" height="1"/></svg></button>
   </div>
@@ -456,6 +460,7 @@ function toggleSidebar() {
 
 // ═══ Players ═══
 const markers = new Map();   // id -> {marker, skin}
+const playersLayer = L.layerGroup().addTo(map);   // all player markers live here so the eye icon can hide them
 let followId = null;
 let lastPlayers = [];
 
@@ -518,7 +523,7 @@ function updateMarkers(players) {
     const ll = toLatLng(pos[0], pos[2]);
     let e = markers.get(p.id);
     if (!e) {
-      const m = L.marker(ll, { icon: markerIcon(p, followId === p.id) }).addTo(map);
+      const m = L.marker(ll, { icon: markerIcon(p, followId === p.id) }).addTo(playersLayer);
       m.on('click', () => setFollow(p.id, p.Username));
       e = { marker: m, skin: p.SkinId };
       markers.set(p.id, e);
@@ -537,7 +542,7 @@ function updateMarkers(players) {
     if (followId === p.id) map.panTo(ll, { animate: false });
   }
   for (const [id, m] of markers) {
-    if (!seen.has(id)) { map.removeLayer(m.marker); markers.delete(id); if (followId === id) stopFollow(); }
+    if (!seen.has(id)) { playersLayer.removeLayer(m.marker); markers.delete(id); if (followId === id) stopFollow(); }
   }
 }
 
@@ -549,6 +554,27 @@ function playSecs(s) {
   if (m = /(\d+)\s*s/.exec(s)) t += +m[1];
   return t;
 }
+
+// eye icon by the "Players" header: hide/show every player marker on the map (persisted)
+const EYE_OPEN = '<svg width="18" height="18" viewBox="0 0 10 10" fill="#fff" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="2" width="4" height="1"/><rect x="2" y="3" width="1" height="1"/><rect x="7" y="3" width="1" height="1"/><rect x="1" y="4" width="1" height="2"/><rect x="8" y="4" width="1" height="2"/><rect x="2" y="6" width="1" height="1"/><rect x="7" y="6" width="1" height="1"/><rect x="3" y="7" width="4" height="1"/><rect x="4" y="4" width="2" height="2"/></svg>';
+const EYE_CLOSED = '<svg width="18" height="18" viewBox="0 0 10 10" fill="#fff" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="3" width="4" height="1"/><rect x="2" y="4" width="1" height="1"/><rect x="7" y="4" width="1" height="1"/><rect x="1" y="5" width="1" height="1"/><rect x="8" y="5" width="1" height="1"/><rect x="2" y="6" width="6" height="1"/></svg>';
+let playersHidden = localStorage.getItem('playersHidden') === '1';
+function applyPlayersVis() {
+  const btn = document.getElementById('plEyeBtn');
+  if (playersHidden) {
+    map.removeLayer(playersLayer);
+    btn.innerHTML = EYE_CLOSED; btn.classList.add('off'); btn.title = 'Show players on map';
+  } else {
+    playersLayer.addTo(map);
+    btn.innerHTML = EYE_OPEN; btn.classList.remove('off'); btn.title = 'Hide players on map';
+  }
+}
+function togglePlayers() {
+  playersHidden = !playersHidden;
+  localStorage.setItem('playersHidden', playersHidden ? '1' : '0');
+  applyPlayersVis();
+}
+applyPlayersVis();
 
 let rosterKey = '';
 let plQuery = '';
