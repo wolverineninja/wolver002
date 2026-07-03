@@ -153,6 +153,10 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 .sessit .t .s2{font-size:11px;color:#aaa;display:block}
 .sessctl{display:flex;gap:6px;padding:5px 7px 6px 16px;background:rgba(255,255,255,.05)}
 .sessctl .mcbtn{font-size:12px;padding:3px 10px 5px;flex:1}
+/* sessions saved in this browser */
+.sesshead{font-size:10px;color:#8fd6de;text-shadow:1px 1px #04222a;text-transform:uppercase;letter-spacing:.09em;padding:7px 2px 3px}
+.sessit .sx{flex:none;cursor:pointer;color:#888;padding:0 4px;font-size:13px;line-height:1}
+.sessit .sx:hover{color:#fff}
 /* session trail end-dot + nametag */
 .strail{position:relative}
 .strail .sdot{position:absolute;left:-6px;top:-6px;width:8px;height:8px;border:2px solid rgba(0,0,0,.7);
@@ -360,7 +364,7 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
     <div id=dbList><div class=pempty>Open to load...</div></div>
   </div>
   <div id=sessSection style=display:none>
-    <div class=dbnote id=sessNote><span class=nx onclick=dismissSessNote() title=Dismiss>x</span>Click a player to list their last 3 join sessions (each rejoin rolls the oldest off). Click a session and its path draws from start to finish &mdash; Rewind plays it backwards, Finish skips to the end. Click the player's name again to hide the trail.</div>
+    <div class=dbnote id=sessNote><span class=nx onclick=dismissSessNote() title=Dismiss>x</span>Click a player to list their last 3 join sessions (each rejoin rolls the oldest off). Click a session and its path draws from start to finish &mdash; Rewind plays it backwards, Finish skips to the end. Click the player's name again to hide the trail. Hit Save to keep a session on this device &mdash; it stays even after it rolls off the server.</div>
     <input id=sessSearch placeholder="Search player..." oninput=renderSessList() autocomplete=off spellcheck=false>
     <div id=sessList><div class=pempty>Open to load...</div></div>
   </div>
@@ -1221,48 +1225,77 @@ async function refreshSessList() {
 }
 const fmtDur = t => { const m = Math.max(1, Math.round(t / 60)); return m < 60 ? m + 'min' : Math.floor(m / 60) + 'h ' + m % 60 + 'min'; };
 
+function sessCtlHtml(saveState) {   // saveState: null = no save button, 'save' | 'saved'
+  return `
+  <div class=sessctl>
+    <button class=mcbtn onclick=rewindSessPlay()>Rewind</button>
+    <button class=mcbtn id=sessSpeedBtn onclick=cycleSessSpeed() title="Replay speed">${SESS_SPEEDS[sessSpeedIdx][0]}</button>
+    <button class=mcbtn onclick=finishSessPlay()>Finish</button>` +
+    (saveState === 'save' ? `<button class=mcbtn onclick=saveCurSession() title="Keep this session on your device">Save</button>` :
+     saveState === 'saved' ? `<button class=mcbtn style="opacity:.55;pointer-events:none">Saved</button>` : '') + `
+  </div>`;
+}
+
 function renderSessList() {
   const list = document.getElementById('sessList');
   const q = (document.getElementById('sessSearch').value || '').trim().toLowerCase();
-  if (!sessPlayers.length) { list.innerHTML = '<div class=pempty>No players tracked yet</div>'; return; }
-  const rows = sessPlayers.filter(p => (p.username || '').toLowerCase().includes(q));
-  if (!rows.length) { list.innerHTML = '<div class=pempty>No players match</div>'; return; }
   const now = Math.floor(Date.now() / 1000);
   let html = '';
-  for (const p of rows) {
-    html += `
-    <div class="dbit${sessSel === p.username ? ' on' : ''}" data-name="${escapeHtml(p.username)}">
-      <span class=nm>
-        <div class=u style="${adminStyle(p.username, 2)}">${escapeHtml(p.username)}</div>
-        <div class=s>seen ${fmtAgo(Math.max(0, now - p.lastSeen))}</div>
-      </span>
-    </div>`;
-    if (sessSel !== p.username) continue;
-    // dropdown: this player's sessions, newest on top
-    if (!sessData) { html += '<div class=pempty>Loading...</div>'; continue; }
-    const ss = sessData.sessions || [];
-    if (!ss.length) { html += '<div class=pempty>No sessions tracked</div>'; continue; }
-    for (let i = ss.length - 1; i >= 0; i--) {
-      const s = ss[i];
-      const col = SESS_COLORS[SESS_COLORS.length - ss.length + i] || SESS_COLORS[0];
-      const active = sessPlay && sessPlay.idx === i;
+  // sessions saved in this browser — kept forever, survive rolling off the server
+  const sv = savedSess.filter(s => (s.username || '').toLowerCase().includes(q));
+  if (sv.length) {
+    html += '<div class=sesshead>Saved on this device</div>';
+    for (const s of sv) {
+      const active = sessPlay && sessPlay.idx === 'sv:' + s.id;
       html += `
-      <div class="sessit${active ? ' on' : ''}" data-i="${i}">
-        <span class=sq style="background:${col}"></span>
-        <span class=t>${s.live ? '<span class=yellow>LIVE</span> &middot; ' : ''}joined ${fmtAgo(Math.max(0, now - s.start))}
-          <span class=s2>${fmtDur(s.end - s.start)} online</span></span>
+      <div class="sessit sv${active ? ' on' : ''}" data-sid="${escapeHtml(s.id)}">
+        <span class=sq style="background:#4fd6e0"></span>
+        <span class=t><span style="color:#c3f4f8">${escapeHtml(s.username)}</span> &middot; joined ${fmtAgo(Math.max(0, now - s.start))}
+          <span class=s2>${fmtDur(s.end - s.start)} online &middot; saved ${fmtAgo(Math.max(0, now - s.savedAt))}</span></span>
+        <span class=sx title="Remove from this device">x</span>
       </div>`;
-      if (active) html += `
-      <div class=sessctl>
-        <button class=mcbtn onclick=rewindSessPlay()>Rewind</button>
-        <button class=mcbtn id=sessSpeedBtn onclick=cycleSessSpeed() title="Replay speed">${SESS_SPEEDS[sessSpeedIdx][0]}</button>
-        <button class=mcbtn onclick=finishSessPlay()>Finish</button>
+      if (active) html += sessCtlHtml(null);
+    }
+    html += '<div class=sesshead>Tracked players</div>';
+  }
+  if (!sessPlayers.length) html += '<div class=pempty>No players tracked yet</div>';
+  else {
+    const rows = sessPlayers.filter(p => (p.username || '').toLowerCase().includes(q));
+    if (!rows.length) html += '<div class=pempty>No players match</div>';
+    for (const p of rows) {
+      html += `
+      <div class="dbit${sessSel === p.username ? ' on' : ''}" data-name="${escapeHtml(p.username)}">
+        <span class=nm>
+          <div class=u style="${adminStyle(p.username, 2)}">${escapeHtml(p.username)}</div>
+          <div class=s>seen ${fmtAgo(Math.max(0, now - p.lastSeen))}</div>
+        </span>
       </div>`;
+      if (sessSel !== p.username) continue;
+      // dropdown: this player's sessions, newest on top
+      if (!sessData) { html += '<div class=pempty>Loading...</div>'; continue; }
+      const ss = sessData.sessions || [];
+      if (!ss.length) { html += '<div class=pempty>No sessions tracked</div>'; continue; }
+      for (let i = ss.length - 1; i >= 0; i--) {
+        const s = ss[i];
+        const col = SESS_COLORS[SESS_COLORS.length - ss.length + i] || SESS_COLORS[0];
+        const active = sessPlay && sessPlay.idx === i;
+        html += `
+        <div class="sessit${active ? ' on' : ''}" data-i="${i}">
+          <span class=sq style="background:${col}"></span>
+          <span class=t>${s.live ? '<span class=yellow>LIVE</span> &middot; ' : ''}joined ${fmtAgo(Math.max(0, now - s.start))}
+            <span class=s2>${fmtDur(s.end - s.start)} online</span></span>
+        </div>`;
+        if (active) html += sessCtlHtml(savedSess.some(x => x.id === sessSel + '_' + s.start) ? 'saved' : 'save');
+      }
     }
   }
   list.innerHTML = html;
   list.querySelectorAll('.dbit').forEach(el => el.addEventListener('click', () => selectSessPlayer(el.dataset.name)));
-  list.querySelectorAll('.sessit').forEach(el => el.addEventListener('click', () => startSessPlay(Number(el.dataset.i))));
+  list.querySelectorAll('.sessit.sv').forEach(el => {
+    el.addEventListener('click', () => startSavedPlay(el.dataset.sid));
+    el.querySelector('.sx').addEventListener('click', e => { e.stopPropagation(); deleteSavedSession(el.dataset.sid); });
+  });
+  list.querySelectorAll('.sessit:not(.sv)').forEach(el => el.addEventListener('click', () => startSessPlay(Number(el.dataset.i))));
 }
 
 // click a name -> expand/collapse their session dropdown
@@ -1284,23 +1317,56 @@ function sessTagIcon(color, text) {
     `<div class=strail><div class=sdot style="background:${color}"></div>` +
     (text ? `<div class=slabel style="color:${color}">${text}</div>` : '') + '</div>' });
 }
-// click a session -> its trail draws itself from start to finish
-function startSessPlay(i) {
+// a trail (server session or one saved on this device) draws itself from start to finish
+function beginTrail(s, col, idxTag, name) {
   clearSessPlay();
-  const s = sessData?.sessions?.[i]; if (!s) return;
-  const ss = sessData.sessions;
-  const col = SESS_COLORS[SESS_COLORS.length - ss.length + i] || SESS_COLORS[0];
+  if (!s.points || !s.points.length) return;
   const lls = s.points.map(([x, y, z]) => toLatLng(x, z));
   const under = L.polyline([], { color: '#000', weight: 5, opacity: .55, interactive: false }).addTo(map);
   const line = L.polyline([], { color: col, weight: 2, opacity: .95, interactive: false }).addTo(map);
   const startDot = L.marker(lls[0], { icon: sessTagIcon(col, 'start'), zIndexOffset: 1500, interactive: false }).addTo(map);
   const head = L.marker(lls[0], { icon: sessTagIcon(col, ''), zIndexOffset: 1600, interactive: false }).addTo(map);
-  sessPlay = { idx: i, name: sessSel, startTs: s.start, endTs: s.end, live: s.live, col, lls,
+  sessPlay = { idx: idxTag, name, startTs: s.start, endTs: s.end, live: !!s.live, col, lls,
                under, line, head, startDot, drawn: 1, prog: 1, dir: 1, last: Date.now(), timer: null, refresh: null, done: false };
   map.fitBounds(L.latLngBounds(lls), { maxZoom: BASE_ZOOM - 1, animate: false });
   sessPlay.timer = setInterval(advanceSessPlay, 30);   // time-based, speed set by the ×-button
   advanceSessPlay();
   renderSessList();
+}
+function startSessPlay(i) {
+  const s = sessData?.sessions?.[i]; if (!s) return;
+  const ss = sessData.sessions;
+  beginTrail(s, SESS_COLORS[SESS_COLORS.length - ss.length + i] || SESS_COLORS[0], i, sessSel);
+}
+
+// ── sessions saved on the viewer's device (localStorage) — costs us nothing server-side ──
+let savedSess = [];
+try { savedSess = JSON.parse(localStorage.getItem('savedSessions') || '[]'); } catch (e) { savedSess = []; }
+function saveCurSession() {
+  const p = sessPlay; if (!p || typeof p.idx !== 'number') return;   // only server sessions can be saved
+  const s = sessData?.sessions?.[p.idx]; if (!s) return;
+  const id = (sessSel || '?') + '_' + s.start;
+  if (savedSess.some(x => x.id === id)) return;
+  if (savedSess.length >= 50) { alert('You can keep up to 50 saved sessions — remove some first.'); return; }
+  savedSess.unshift({ id, username: sessSel, start: s.start, end: s.end, points: s.points,
+                      savedAt: Math.floor(Date.now() / 1000) });
+  try { localStorage.setItem('savedSessions', JSON.stringify(savedSess)); }
+  catch (e) {
+    savedSess.shift();
+    alert('Not enough space left in your browser to save this session — remove some saved sessions first.');
+    return;
+  }
+  renderSessList();
+}
+function deleteSavedSession(id) {
+  savedSess = savedSess.filter(x => x.id !== id);
+  localStorage.setItem('savedSessions', JSON.stringify(savedSess));
+  if (sessPlay && sessPlay.idx === 'sv:' + id) clearSessPlay();
+  renderSessList();
+}
+function startSavedPlay(id) {
+  const s = savedSess.find(x => x.id === id); if (!s) return;
+  beginTrail({ ...s, live: false }, '#4fd6e0', 'sv:' + id, s.username);
 }
 function advanceSessPlay() {
   const p = sessPlay; if (!p || p.done) return;
