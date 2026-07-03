@@ -645,13 +645,14 @@ window.addEventListener('storage', e => {
   }
 });
 
-// ═══ Waypoint filters (Personal default / Community / Admin) ═══
-let wpFilter = 'personal';
-function setWpFilter(f) {
+// ═══ Waypoint filters (Personal default / Community / Trusted) — last choice is remembered ═══
+let wpFilter = ['personal', 'community', 'trusted'].includes(localStorage.getItem('wpFilter')) ? localStorage.getItem('wpFilter') : 'personal';
+function setWpFilter(f, skipAck) {
   wpFilter = f;
+  localStorage.setItem('wpFilter', f);
   document.querySelectorAll('.wpftabs [data-wpf]').forEach(b => b.classList.toggle('on', b.dataset.wpf === f));
   renderWpFilter();
-  if (f === 'community' && localStorage.getItem('wpCommunityAck2') !== '1') openWpAck();
+  if (!skipAck && f === 'community' && localStorage.getItem('wpCommunityAck2') !== '1') openWpAck();
 }
 let cwpTimer = null;
 function renderWpFilter() {
@@ -779,6 +780,7 @@ const markers = new Map();   // id -> {marker, skin}
 const playersLayer = L.layerGroup().addTo(map);   // all player markers live here so the eye icon can hide them
 const wpLayer = L.layerGroup().addTo(map);        // personal waypoint markers — toggled by the Waypoints filter
 const cwpLayer = L.layerGroup();                  // community waypoint markers — shown under the Community filter
+setWpFilter(wpFilter, true);                      // restore the remembered filter (skip the ack popup on load)
 let followId = null;
 let lastPlayers = [];
 
