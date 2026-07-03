@@ -121,17 +121,21 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 .basemark .blabel{position:absolute;left:16px;top:-16px;white-space:nowrap;font-size:10px;color:#ffd98a;
   text-shadow:1px 1px #000;background:rgba(0,0,0,.45);padding:0 4px 2px;pointer-events:none}
 /* 2atabase + Sessions panels */
-#dbPanel,#sessPanel{position:fixed;top:66px;left:12px;bottom:12px;z-index:25;display:none;flex-direction:column;width:274px;
+#dbPanel{position:fixed;top:66px;left:12px;bottom:12px;z-index:25;display:none;flex-direction:column;width:274px;
   background:rgba(0,0,0,.66);border:2px solid #000;padding:8px}
-#dbPanel.open,#sessPanel.open{display:flex}
-#dbPanel h4,#sessPanel h4{font-size:14px;font-weight:normal;text-align:center;padding-bottom:6px;text-shadow:2px 2px #3e3e3e}
+#dbPanel.open{display:flex}
+#dbPanel h4{font-size:14px;font-weight:normal;text-align:center;padding-bottom:6px;text-shadow:2px 2px #3e3e3e}
+.dbtabs{display:flex;gap:6px;margin-bottom:7px}
+.dbtabs .mcbtn{flex:1;font-size:14px;padding:5px 8px 7px}
+.dbtabs .mcbtn.on{background:#7c81b8;border-color:#fff}
+#dbSection,#sessSection{flex:1;min-height:0;display:flex;flex-direction:column}
 .dbnote{font-size:11px;color:#ffd98a;text-shadow:1px 1px #000;background:rgba(120,90,20,.22);
   border:1px solid #6a5015;padding:5px 7px;margin-bottom:7px;line-height:1.35}
 #dbSearch,#sessSearch{font-family:MC,monospace;background:#000;border:2px solid #a0a0a0;color:#fff;font-size:14px;
   padding:6px 8px;margin-bottom:7px;outline:0}
 #dbSearch:focus,#sessSearch:focus{border-color:#fff}
 #dbSearch::placeholder,#sessSearch::placeholder{color:#666}
-#dbList,#sessList{overflow-y:auto;display:flex;flex-direction:column;gap:2px}
+#dbList,#sessList{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:2px}
 #dbList::-webkit-scrollbar,#sessList::-webkit-scrollbar{width:10px}
 #dbList::-webkit-scrollbar-track,#sessList::-webkit-scrollbar-track{background:#000}
 #dbList::-webkit-scrollbar-thumb,#sessList::-webkit-scrollbar-thumb{background:#6d6d6d;border:2px solid #000}
@@ -246,7 +250,6 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
   <div class=mcfield><span class=lab>Z</span><input id=gotoZ type=number placeholder=0></div>
   <button class=mcbtn id=extbtn onclick=toggleExtPanel()>Extensions</button>
   <button class=mcbtn id=dbbtn onclick=toggleDbPanel()>2atabase</button>
-  <button class=mcbtn id=sessbtn onclick=toggleSessPanel()>Sessions</button>
   <button class=mcbtn onclick=refreshTiles()>Reload</button>
   <button class=mcbtn onclick=toggleSidebar()>List</button>
   <div class=online>
@@ -280,16 +283,20 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 
 <div id=dbPanel>
   <h4>2atabase</h4>
-  <div class=dbnote>Still collecting &amp; analyzing data &mdash; it will likely take 1 week+ of tracking to get accurate base coordinates.</div>
-  <input id=dbSearch placeholder="Search player..." oninput=renderDbList() autocomplete=off spellcheck=false>
-  <div id=dbList><div class=pempty>Open to load...</div></div>
-</div>
-
-<div id=sessPanel>
-  <h4>Sessions</h4>
-  <div class=dbnote>Click a player to list their last 3 join sessions (each rejoin rolls the oldest off). Click a session and its path draws from start to finish &mdash; Rewind plays it backwards, Finish skips to the end. Click the player's name again to hide the trail.</div>
-  <input id=sessSearch placeholder="Search player..." oninput=renderSessList() autocomplete=off spellcheck=false>
-  <div id=sessList><div class=pempty>Open to load...</div></div>
+  <div class=dbtabs>
+    <button class="mcbtn on" id=tabBases onclick="setDbTab('bases')">Bases</button>
+    <button class=mcbtn id=tabSess onclick="setDbTab('sess')">Sessions</button>
+  </div>
+  <div id=dbSection>
+    <div class=dbnote>Still collecting &amp; analyzing data &mdash; it will likely take 1 week+ of tracking to get accurate base coordinates.</div>
+    <input id=dbSearch placeholder="Search player..." oninput=renderDbList() autocomplete=off spellcheck=false>
+    <div id=dbList><div class=pempty>Open to load...</div></div>
+  </div>
+  <div id=sessSection style=display:none>
+    <div class=dbnote>Click a player to list their last 3 join sessions (each rejoin rolls the oldest off). Click a session and its path draws from start to finish &mdash; Rewind plays it backwards, Finish skips to the end. Click the player's name again to hide the trail.</div>
+    <input id=sessSearch placeholder="Search player..." oninput=renderSessList() autocomplete=off spellcheck=false>
+    <div id=sessList><div class=pempty>Open to load...</div></div>
+  </div>
 </div>
 
 <div id=wpBanner>Click anywhere on the map to add a waypoint &middot; <span class=cx onclick=cancelWpPlace()>cancel</span></div>
@@ -749,13 +756,24 @@ function toggleDbPanel() {
   dbOpen = !dbOpen;
   document.getElementById('dbPanel').classList.toggle('open', dbOpen);
   if (dbOpen) {
-    if (sessOpen) toggleSessPanel();     // the two panels share the left edge
     refreshBases();
     clearInterval(dbTimer);
     dbTimer = setInterval(refreshBases, 15000);
+    refreshSessList();                   // Sessions lives in this panel too, as a tab
+    clearInterval(sessTimer);
+    sessTimer = setInterval(refreshSessList, 60000);
   } else {
     clearInterval(dbTimer); dbTimer = null;
+    clearInterval(sessTimer); sessTimer = null;
   }
+}
+
+// swap between the Bases and Sessions tabs inside the 2atabase panel
+function setDbTab(t) {
+  document.getElementById('dbSection').style.display = t === 'bases' ? 'flex' : 'none';
+  document.getElementById('sessSection').style.display = t === 'sess' ? 'flex' : 'none';
+  document.getElementById('tabBases').classList.toggle('on', t === 'bases');
+  document.getElementById('tabSess').classList.toggle('on', t === 'sess');
 }
 
 async function refreshBases() {
@@ -797,21 +815,9 @@ const SESS_API = 'https://admin.wolver002.com/factions/api/sessions';
 const SESS_COLORS = ['#9a9a9a', '#ff9a3b', '#ffff55'];   // oldest -> newest
 const SESS_SPEEDS = [['1x', .4], ['2x', .8], ['5x', 2], ['10x', 4], ['25x', 10], ['50x', 20]];   // label, trail points drawn per second
 let sessSpeedIdx = Math.min(SESS_SPEEDS.length - 1, +localStorage.getItem('sessSpeedIdx') || 0);
-let sessOpen = false, sessTimer = null;
+let sessTimer = null;
 let sessPlayers = [], sessSel = null, sessData = null, sessPlay = null;
 
-function toggleSessPanel() {
-  sessOpen = !sessOpen;
-  document.getElementById('sessPanel').classList.toggle('open', sessOpen);
-  if (sessOpen) {
-    if (dbOpen) toggleDbPanel();
-    refreshSessList();
-    clearInterval(sessTimer);
-    sessTimer = setInterval(refreshSessList, 60000);
-  } else {
-    clearInterval(sessTimer); sessTimer = null;
-  }
-}
 async function refreshSessList() {
   try { const d = await (await fetch(SESS_API, { cache: 'no-store' })).json(); sessPlayers = d.players || []; }
   catch (e) { return; }
