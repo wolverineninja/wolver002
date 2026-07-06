@@ -78,6 +78,12 @@ body{font-family:MC,monospace;color:#fff;-webkit-font-smoothing:none;font-smooth
 .it .nm .u{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:2px 2px #3e3e3e}
 .it .nm .s{font-size:12px;color:#aaa;text-shadow:2px 2px #2a2a2a}
 .it .pgslot{font-size:12px;color:#aaa;text-shadow:2px 2px #2a2a2a;text-align:right;flex:none;white-space:nowrap}
+/* pin-to-top button: shows on row hover, stays lit gold once pinned */
+.it .pinb{flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;
+  color:#ddd;opacity:0;transition:opacity .12s}
+.it:hover .pinb{opacity:.55}
+.it .pinb:hover{opacity:1}
+.it.pin .pinb{opacity:1;color:#ffd75c}
 .pempty{color:#aaa;font-size:14px;text-align:center;padding:14px 0;text-shadow:2px 2px #2a2a2a}
 
 /* ── F3-style coords, bottom left ── */
@@ -828,7 +834,7 @@ function toggleClickSound() {
 }
 syncClickBtn();
 document.addEventListener('pointerdown', e => {
-  if (!clickSoundOn || !e.target.closest('.mcbtn, .snavbtn, .spdopt') || !_actx || !_clickBuf) return;
+  if (!clickSoundOn || !e.target.closest('.mcbtn, .snavbtn, .spdopt, .pinb') || !_actx || !_clickBuf) return;
   if (_actx.state === 'suspended') _actx.resume();
   const src = _actx.createBufferSource(); src.buffer = _clickBuf;
   const g = _actx.createGain(); g.gain.value = 0.5;
@@ -1005,22 +1011,41 @@ function plSearchInput() {
   plQuery = document.getElementById('plSearch').value.trim().toLowerCase();
   renderList(lastPlayers);
 }
+// ═══ Pinned players (per browser): pinned names stick to the top of the roster.
+// Pins key on USERNAME, not player id — FactionsVR hands out a new id nearly
+// every session, so ids don't survive a relog. ═══
+let pinned = new Set();
+try { pinned = new Set(JSON.parse(localStorage.getItem('pinnedPlayers') || '[]')); } catch (e) {}
+const isPinned = p => pinned.has((p.Username || '').toLowerCase());
+function togglePin(name) {
+  const k = (name || '').toLowerCase();
+  if (!k) return;
+  pinned.has(k) ? pinned.delete(k) : pinned.add(k);
+  localStorage.setItem('pinnedPlayers', JSON.stringify([...pinned]));
+  renderList(lastPlayers);
+}
+const PIN_SVG = `<svg width="14" height="14" viewBox="0 0 10 10" fill="currentColor" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg">
+  <rect x="3" y="0" width="4" height="4"/><rect x="2" y="4" width="6" height="1"/>
+  <rect x="4" y="5" width="2" height="2"/><rect x="4" y="7" width="1" height="2"/></svg>`;
+
 function renderList(players) {
   const list = document.getElementById('playerList');
   document.getElementById('onlineCount').textContent = players.length;
   document.getElementById('playerCount').textContent = players.length ? `Players — ${players.length}` : 'Players';
   if (!players.length) { list.innerHTML = '<div class=pempty>No players online</div>'; rosterKey = ''; return; }
-  const sorted = [...players].sort((a, b) => playSecs(b.PlayTime) - playSecs(a.PlayTime)) // longest on top
+  const sorted = [...players].sort((a, b) =>
+      (isPinned(b) - isPinned(a)) || (playSecs(b.PlayTime) - playSecs(a.PlayTime))) // pinned first, then longest on
     .filter(p => !plQuery || (p.Username || '').toLowerCase().includes(plQuery));
   if (!sorted.length) { list.innerHTML = '<div class=pempty>No players match</div>'; rosterKey = ''; return; }
-  const key = plQuery + '|' + sorted.map(p => `${p.id}:${p.SkinId}`).join(',');
+  const key = plQuery + '|' + sorted.map(p => `${p.id}:${p.SkinId}:${isPinned(p) ? 1 : 0}`).join(',');
   if (key !== rosterKey) {
     rosterKey = key;
     list.innerHTML = sorted.map(p => `
-      <div class=it data-id="${p.id}">
+      <div class="it${isPinned(p) ? ' pin' : ''}" data-id="${p.id}">
         <span class=gi>${headHtml(p.SkinId)}</span>
         <span class=nm><div class=u style="${adminStyle(p.Username, 2)}">${escapeHtml(p.Username || '?')}</div><div class=s></div></span>
         <span class=pgslot></span>
+        <span class=pinb title="Pin to top">${PIN_SVG}</span>
       </div>`).join('');
     list.querySelectorAll('.it').forEach(el => el.addEventListener('click', () => {
       const id = Number(el.dataset.id);
@@ -1029,6 +1054,11 @@ function renderList(players) {
       setFollow(id, p.Username);
       const pos = p.Pose?.Head?.Position;
       if (pos && followId === id) map.setView(toLatLng(pos[0], pos[2]), Math.max(map.getZoom(), BASE_ZOOM - 1));
+    }));
+    list.querySelectorAll('.pinb').forEach(el => el.addEventListener('click', e => {
+      e.stopPropagation();                       // pinning shouldn't start following
+      const p = lastPlayers.find(q => q.id === Number(el.closest('.it').dataset.id));
+      if (p) togglePin(p.Username);
     }));
   }
   // per-poll updates happen in place so the list doesn't flicker or lose scroll position
