@@ -183,6 +183,10 @@ body.noArrows .pmarker .arrow{display:none}
   border:2px solid rgba(0,0,0,.7);transform:rotate(45deg);box-shadow:0 0 0 2px rgba(0,0,0,.55)}
 .wpmark .wlabel{position:absolute;left:11px;top:-8px;white-space:nowrap;font-size:11px;color:#c3f4f8;
   text-shadow:1px 1px #04222a;background:rgba(0,0,0,.5);padding:0 5px 2px;pointer-events:none}
+/* claim totem: upright purple square (vs the rotated waypoint diamond) */
+.wpmark .totm{position:absolute;left:-7px;top:-7px;width:12px;height:12px;background:#c84bff;
+  border:2px solid rgba(0,0,0,.7);box-shadow:0 0 0 2px rgba(0,0,0,.55);
+  background-image:linear-gradient(rgba(255,255,255,.4),rgba(255,255,255,0) 50%)}
 /* waypoint click menu */
 #wpMenu{position:fixed;z-index:35;display:none;width:170px;background:rgba(0,0,0,.86);border:2px solid #000;
   box-shadow:0 0 0 2px #2a6b72;padding:8px}
@@ -366,6 +370,7 @@ body.noArrows .pmarker .arrow{display:none}
   <div class=dbtabs>
     <button class="mcbtn on" id=tabBases onclick="setDbTab('bases')">Bases</button>
     <button class=mcbtn id=tabSess onclick="setDbTab('sess')">Sessions</button>
+    <button class=mcbtn id=tabTotems onclick="setDbTab('totems')">Totems</button>
   </div>
   <div id=dbSection>
     <div class=dbnote>Still collecting &amp; analyzing data &mdash; it will likely take 1 week+ of tracking to get accurate base coordinates.</div>
@@ -377,9 +382,14 @@ body.noArrows .pmarker .arrow{display:none}
     <input id=sessSearch placeholder="Search player..." oninput=renderSessList() autocomplete=off spellcheck=false>
     <div id=sessList><div class=pempty>Open to load...</div></div>
   </div>
+  <div id=totemSection style=display:none>
+    <div class=dbnote>Claim totems marked by trusted players &mdash; everyone sees them. Click one to jump to it; turn on the radius outline in Settings &gt; Waypoints.</div>
+    <input id=totemSearch placeholder="Search totems..." oninput=renderTotemList() autocomplete=off spellcheck=false>
+    <div id=totemList><div class=pempty>No totems marked yet</div></div>
+  </div>
 </div>
 
-<div id=wpBanner>Click anywhere on the map to add a waypoint &middot; <span class=cx onclick=cancelWpPlace()>cancel</span></div>
+<div id=wpBanner><span id=wpBannerTxt>Click anywhere on the map to add a waypoint</span> &middot; <span class=cx onclick=cancelWpPlace()>cancel</span></div>
 <div id=wpMenu>
   <div class=wpm-head><span id=wpmName></span><span class=stop onclick=closeWpMenu()>x</span></div>
   <div id=wpmSwatches></div>
@@ -450,6 +460,19 @@ body.noArrows .pmarker .arrow{display:none}
           <button class=mcbtn data-wpf=trusted onclick="setWpFilter('trusted')">Trusted</button>
         </div>
         <div id=wpNotice class=wpnotice style=display:none></div>
+        <div class=wpfhead><span class=wpfdiv>Totems</span></div>
+        <div class=setrow>
+          <div class=setlab>Add totem<div class=setsub>Mark a claim totem everyone can see &mdash; trusted accounts only; listed under 2atabase &gt; Totems</div></div>
+          <button class=mcbtn onclick=startTotemPlace()>Add</button>
+        </div>
+        <div class=setrow>
+          <div class=setlab>Totem radius<div class=setsub>Outline the territory each totem claims</div></div>
+          <button class=mcbtn id=setTotemRadBtn onclick=toggleTotemRadius()>OFF</button>
+        </div>
+        <div class=setrow>
+          <div class=setlab>Radius size<div class=setsub>Claim radius in blocks</div></div>
+          <input id=totemRadIn class=setnum type=number min=1 step=1 value=64 onchange=setTotemRadius(this.value)>
+        </div>
       </div>
       <div class=spane id=paneHeatmap data-tab=heatmap style=display:none>
         <div class=setrow>
@@ -697,18 +720,11 @@ function setWpFilter(f, skipAck) {
   renderWpFilter();
   if (!skipAck && f === 'community' && localStorage.getItem('wpCommunityAck2') !== '1') openWpAck();
 }
-let cwpTimer = null;
 function renderWpFilter() {
-  // filters control which waypoints show on the map
+  // filters control which waypoints show on the map (totems are always shown)
   if (wpFilter === 'personal') wpLayer.addTo(map); else map.removeLayer(wpLayer);
   if (wpFilter === 'community') cwpLayer.addTo(map); else map.removeLayer(cwpLayer);
   if (wpFilter === 'trusted') twpLayer.addTo(map); else map.removeLayer(twpLayer);
-  if (wpFilter === 'community' || wpFilter === 'trusted') {
-    loadCommunityWps();
-    clearInterval(cwpTimer); cwpTimer = setInterval(loadCommunityWps, 15000);   // stay live, no refresh needed
-  } else {
-    clearInterval(cwpTimer); cwpTimer = null;
-  }
   const note = document.getElementById('wpNotice');
   if (note) {
     if (wpFilter === 'community') {
@@ -733,10 +749,12 @@ function cwpIcon(w) {
 function renderCommunityWps() {
   cwpLayer.clearLayers(); twpLayer.clearLayers();
   for (const w of communityWps) {
+    if (w.tier === 'totem') continue;                    // totems render on their own always-on layer
     const m = L.marker(toLatLng(w.x, w.z), { icon: cwpIcon(w), zIndexOffset: 1800 })
       .addTo(w.tier === 'trusted' ? twpLayer : cwpLayer);
     m.on('click', () => openCwpMenu(w));
   }
+  renderTotems();
 }
 let cwpMenuId = null;
 function openCwpMenu(w) {
@@ -764,11 +782,12 @@ function loadCommunityWps() {
 }
 function addCommunityWaypoint(x, z, tier) {
   if (!userToken) { openAuth(); return; }                 // must be logged in to post a shared waypoint
-  tier = tier === 'trusted' ? 'trusted' : 'community';
-  const name = prompt((tier === 'trusted' ? 'Trusted' : 'Community') + ' waypoint name:', 'Waypoint');
+  tier = ['trusted', 'totem'].includes(tier) ? tier : 'community';
+  const label = tier === 'totem' ? 'Totem name:' : (tier === 'trusted' ? 'Trusted waypoint name:' : 'Community waypoint name:');
+  const name = prompt(label, tier === 'totem' ? 'Totem' : 'Waypoint');
   if (name === null) return;
   fetch(CWP_API, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token: userToken, name: name.trim() || 'Waypoint', x: Math.round(x), z: Math.round(z), tier }) })
+    body: JSON.stringify({ token: userToken, name: name.trim() || (tier === 'totem' ? 'Totem' : 'Waypoint'), x: Math.round(x), z: Math.round(z), tier }) })
     .then(r => r.json()).then(d => {
       if (d.error) { alert(d.error); return; }             // e.g. "only whitelisted accounts"
       communityWps.unshift(d); renderCommunityWps();
@@ -856,6 +875,8 @@ const wpLayer = L.layerGroup().addTo(map);        // personal waypoint markers �
 const cwpLayer = L.layerGroup();                  // community waypoint markers — shown under the Community filter
 const twpLayer = L.layerGroup();                  // trusted waypoint markers — shown under the Trusted filter
 setWpFilter(wpFilter, true);                      // restore the remembered filter (skip the ack popup on load)
+loadCommunityWps();                               // shared waypoints + totems stay live for everyone
+setInterval(loadCommunityWps, 15000);
 let followId = null;
 let lastPlayers = [];
 
@@ -1088,14 +1109,26 @@ function closeWpMenu() { wpMenuId = null; document.getElementById('wpMenu').clas
 renderWaypoints();
 
 // "Add" waypoint from Settings > General: arm place-mode, then the next map click drops one
-let wpPlaceMode = false;
+let wpPlaceMode = false, placeType = 'wp';        // 'wp' | 'totem' — what the next map click drops
 function startWpPlace() {
   if ((wpFilter === 'community' || wpFilter === 'trusted') && !userToken) {   // must be logged in to place a shared waypoint
     document.getElementById('settingsModal').classList.remove('open');
     openAuth();
     return;
   }
-  wpPlaceMode = true;
+  armPlace('wp', 'Click anywhere on the map to add a waypoint');
+}
+function startTotemPlace() {
+  if (!userToken) {                                     // totems are shared — must be logged in (and whitelisted)
+    document.getElementById('settingsModal').classList.remove('open');
+    openAuth();
+    return;
+  }
+  armPlace('totem', 'Click the map where the totem stands');
+}
+function armPlace(type, msg) {
+  wpPlaceMode = true; placeType = type;
+  document.getElementById('wpBannerTxt').textContent = msg;
   document.getElementById('settingsModal').classList.remove('open');
   document.getElementById('wpBanner').classList.add('on');
   document.getElementById('map').style.cursor = 'crosshair';
@@ -1106,6 +1139,45 @@ function cancelWpPlace() {
   document.getElementById('map').style.cursor = '';
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && wpPlaceMode) cancelWpPlace(); });
+
+// ═══ Claim totems — SHARED map intel (tier 'totem' in the waypoints API): placed by
+// trusted accounts, visible to EVERYONE, listed in the 2atabase panel. The radius
+// outline (claim area) is a per-browser display setting. ═══
+const TOTEM_COLOR = '#c84bff';
+let totemRadiusOn = localStorage.getItem('totemRadiusOn') === '1';
+let totemRadius = Math.max(1, Math.round(+localStorage.getItem('totemRadius')) || 64);
+const totemLayer = L.layerGroup().addTo(map);   // always visible, independent of waypoint filters
+function totemIcon(t) {
+  return L.divIcon({ className: '', iconSize: [0, 0],
+    html: `<div class=wpmark><div class=totm></div><div class=wlabel style="color:${TOTEM_COLOR}">${escapeHtml(t.name)} <span style="opacity:.65">&middot; ${escapeHtml(t.username)}</span></div></div>` });
+}
+function renderTotems() {
+  totemLayer.clearLayers();
+  for (const w of communityWps.filter(q => q.tier === 'totem')) {
+    if (totemRadiusOn)                                  // territory outline under the marker
+      L.circle(toLatLng(w.x, w.z), { radius: totemRadius * UPB, color: TOTEM_COLOR, weight: 2,
+        dashArray: '6 6', fillColor: TOTEM_COLOR, fillOpacity: .07, interactive: false }).addTo(totemLayer);
+    const m = L.marker(toLatLng(w.x, w.z), { icon: totemIcon(w), zIndexOffset: 1900 }).addTo(totemLayer);
+    m.on('click', () => openCwpMenu(w));                // same menu: owner-only delete
+  }
+  renderTotemList();
+}
+function addTotem(x, z) { addCommunityWaypoint(x, z, 'totem'); }
+function toggleTotemRadius() {
+  totemRadiusOn = !totemRadiusOn;
+  localStorage.setItem('totemRadiusOn', totemRadiusOn ? '1' : '0');
+  document.getElementById('setTotemRadBtn').textContent = totemRadiusOn ? 'ON' : 'OFF';
+  renderTotems();
+}
+function setTotemRadius(v) {
+  totemRadius = Math.max(1, Math.min(2000, Math.round(+v) || 64));
+  localStorage.setItem('totemRadius', totemRadius);
+  document.getElementById('totemRadIn').value = totemRadius;   // reflect clamping
+  renderTotems();
+}
+document.getElementById('setTotemRadBtn').textContent = totemRadiusOn ? 'ON' : 'OFF';
+document.getElementById('totemRadIn').value = totemRadius;
+renderTotems();
 
 // ═══ Heatmap — crimson-style glow under live players, with a trail: heat cools and
 // vanishes HEAT_TRAIL_MS after a player leaves a spot (duration set in Settings) ═══
@@ -1150,9 +1222,10 @@ function closeAt() { document.getElementById('atPopup').classList.remove('open')
 
 map.on('click', e => {
   closeWpMenu(); closeCwpMenu();           // clicking the map dismisses the waypoint menus
-  if (wpPlaceMode) {                       // placing a waypoint takes priority
+  if (wpPlaceMode) {                       // placing a waypoint/totem takes priority
+    const type = placeType;
     cancelWpPlace();
-    addWaypoint(e.latlng.lng / UPB, -e.latlng.lat / UPB);
+    (type === 'totem' ? addTotem : addWaypoint)(e.latlng.lng / UPB, -e.latlng.lat / UPB);
     return;
   }
   if (!ext.heat) return;
@@ -1214,12 +1287,37 @@ function toggleDbPanel() {
   }
 }
 
-// swap between the Bases and Sessions tabs inside the 2atabase panel
+// swap between the Bases / Sessions / Totems tabs inside the 2atabase panel
 function setDbTab(t) {
   document.getElementById('dbSection').style.display = t === 'bases' ? 'flex' : 'none';
   document.getElementById('sessSection').style.display = t === 'sess' ? 'flex' : 'none';
+  document.getElementById('totemSection').style.display = t === 'totems' ? 'flex' : 'none';
   document.getElementById('tabBases').classList.toggle('on', t === 'bases');
   document.getElementById('tabSess').classList.toggle('on', t === 'sess');
+  document.getElementById('tabTotems').classList.toggle('on', t === 'totems');
+  if (t === 'totems') { loadCommunityWps(); renderTotemList(); }
+}
+
+// the Totems tab lists every shared totem; click a row to jump the map to it
+function renderTotemList() {
+  const list = document.getElementById('totemList'); if (!list) return;
+  const q = (document.getElementById('totemSearch').value || '').trim().toLowerCase();
+  const ts = communityWps.filter(w => w.tier === 'totem')
+    .filter(w => (w.name + ' ' + w.username).toLowerCase().includes(q));
+  if (!ts.length) {
+    list.innerHTML = `<div class=pempty>${q ? 'No totems match' : 'No totems marked yet'}</div>`;
+    return;
+  }
+  list.innerHTML = ts.map(w => `<div class=dbit data-tid="${w.id}">
+    <span class=nm>
+      <div class=u style="color:${TOTEM_COLOR}">${escapeHtml(w.name)}</div>
+      <div class=s>${Math.round(w.x)}, ${Math.round(w.z)} &middot; marked by ${escapeHtml(w.username)}</div>
+    </span>
+  </div>`).join('');
+  list.querySelectorAll('.dbit').forEach(el => el.addEventListener('click', () => {
+    const w = communityWps.find(x => x.id === Number(el.dataset.tid) && x.tier === 'totem');
+    if (w) map.setView(toLatLng(w.x, w.z), Math.max(map.getZoom(), BASE_ZOOM - 2));
+  }));
 }
 
 // the Sessions how-to note can be dismissed; stays hidden per browser
