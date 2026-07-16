@@ -55,8 +55,12 @@ input::placeholder{color:#8a8a8a}
 </div>
 <script>
 var API='https://admin.wolver002.com';
+var STORE='wolver_refresh_key';
 var go=document.getElementById('go'),msg=document.getElementById('msg'),
     keyEl=document.getElementById('key');
+// remember the key across reloads (this browser only)
+try{keyEl.value=localStorage.getItem(STORE)||'';}catch(e){}
+keyEl.addEventListener('input',function(){try{localStorage.setItem(STORE,keyEl.value);}catch(e){}});
 go.onclick=async function(){
   var k=keyEl.value.trim();
   if(!k){msg.className='msg bad';msg.textContent='Enter your key.';return;}
