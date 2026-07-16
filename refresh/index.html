@@ -48,24 +48,21 @@ input::placeholder{color:#8a8a8a}
 <div class=card>
   <label for=key>Key</label>
   <input id=key type=password placeholder="Paste your key&hellip;" autocomplete=off>
-  <label for=acct>Account username</label>
-  <input id=acct placeholder="e.g. aWf8k9POEuY31hfW" autocomplete=off>
   <button class="btn go" id=go>Download token.json</button>
   <div class=msg id=msg></div>
 </div>
-<p class=note>Enter the key you were given to pull a live Animal Company session token.<br>Leave the account blank if there is only one.</p>
+<p class=note>Enter the key you were given to pull a live Animal Company session token.<br>Your key is linked to your account &mdash; that's all you need.</p>
 </div>
 <script>
 var API='https://admin.wolver002.com';
 var go=document.getElementById('go'),msg=document.getElementById('msg'),
-    keyEl=document.getElementById('key'),acctEl=document.getElementById('acct');
+    keyEl=document.getElementById('key');
 go.onclick=async function(){
-  var k=keyEl.value.trim(),a=acctEl.value.trim();
+  var k=keyEl.value.trim();
   if(!k){msg.className='msg bad';msg.textContent='Enter your key.';return;}
   go.disabled=true;msg.className='msg';msg.textContent='Fetching…';
   try{
-    var url=API+'/refresher/token.json'+(a?'?acct='+encodeURIComponent(a):'');
-    var r=await fetch(url,{headers:{'X-Refresher-Key':k}});
+    var r=await fetch(API+'/refresher/token.json',{headers:{'X-Refresher-Key':k}});
     if(!r.ok){
       var e=await r.json().catch(function(){return {error:'HTTP '+r.status};});
       msg.className='msg bad';msg.textContent=e.error||('Failed (HTTP '+r.status+')');go.disabled=false;return;}
@@ -77,6 +74,5 @@ go.onclick=async function(){
   }catch(ex){msg.className='msg bad';msg.textContent='Could not reach the server. '+ex;}
   go.disabled=false;
 };
-keyEl.addEventListener('keydown',function(e){if(e.key==='Enter')acctEl.focus();});
-acctEl.addEventListener('keydown',function(e){if(e.key==='Enter')go.click();});
+keyEl.addEventListener('keydown',function(e){if(e.key==='Enter')go.click();});
 </script></body></html>
