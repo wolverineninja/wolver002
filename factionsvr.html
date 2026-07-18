@@ -4,111 +4,41 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>FactionsVR · wolver002</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='14' font-size='14'%3E%E2%97%8F%3C/text%3E%3C/svg%3E" />
+  <link rel="icon" href="/wfm/favicon.png" />
   <style>
-    :root {
-      --bg: #0b0b0c;
-      --fg: #e8e8ea;
-      --muted: #8a8a92;
-      --line: #1f1f23;
-      --card: #111114;
-    }
-    * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; }
-    body {
-      background: var(--bg);
-      color: var(--fg);
-      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      line-height: 1.55;
-      -webkit-font-smoothing: antialiased;
-    }
-    main {
-      max-width: 880px;
-      margin: 0 auto;
-      padding: 64px 24px 96px;
-    }
-    .back {
-      color: var(--muted);
-      text-decoration: none;
-      font-size: 14px;
-      display: inline-block;
-      margin-bottom: 32px;
-    }
-    .back:hover { color: var(--fg); }
-    h1 {
-      font-size: clamp(28px, 4vw, 40px);
-      letter-spacing: -0.02em;
-      margin: 0 0 28px;
-      font-weight: 600;
-    }
-    .video-wrap {
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      overflow: hidden;
-      background: #000;
-    }
-    .video-wrap video {
-      display: block;
-      width: 100%;
-      height: auto;
-      max-height: 80vh;
-    }
-    .features-heading {
-      font-size: 18px;
-      font-weight: 600;
-      margin: 0 0 10px;
-      color: var(--fg);
-    }
-    .features {
-      list-style: disc;
-      padding-left: 22px;
-      margin: 0 0 28px;
-      color: var(--muted);
-      font-size: 15px;
-      line-height: 1.8;
-    }
-    .switcher {
-      display: flex;
-      gap: 0;
-      margin-bottom: 14px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      overflow: hidden;
-      width: fit-content;
-    }
-    .switcher button {
-      padding: 8px 18px;
-      background: var(--card);
-      border: none;
-      color: var(--muted);
-      font: inherit;
-      font-size: 14px;
-      cursor: pointer;
-      transition: background 160ms ease, color 160ms ease;
-    }
-    .switcher button:not(:last-child) {
-      border-right: 1px solid var(--line);
-    }
-    .switcher button.active {
-      background: #1f1f23;
-      color: var(--fg);
-    }
-    .switcher button:hover:not(.active) {
-      background: #131318;
-    }
-    .credit {
-      color: var(--muted);
-      font-size: 13px;
-      margin-top: 10px;
-    }
+    @font-face{font-family:MC;src:url('/wfm/Minecraft.otf');font-weight:normal}
+    @font-face{font-family:MC;src:url('/wfm/Minecraft-Bold.otf');font-weight:bold}
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:MC,monospace;color:#e8e8e8;min-height:100vh;-webkit-font-smoothing:none;font-smooth:never;
+      background:linear-gradient(rgba(0,0,0,.62),rgba(0,0,0,.62)),url('/wfm/dirt.png');
+      background-size:auto,48px 48px;image-rendering:pixelated}
+    main{max-width:900px;margin:0 auto;padding:48px 22px 72px}
+    .back{display:inline-block;color:#bdbdbd;text-decoration:none;font-size:14px;margin-bottom:28px;text-shadow:1px 1px #000}
+    .back:hover{color:#ffd98a}
+    h1{font-size:clamp(24px,4.5vw,40px);color:#fff;font-weight:bold;text-shadow:3px 3px #3e3e3e;margin:0 0 26px;line-height:1.2}
+    .features-heading{font-size:13px;text-transform:uppercase;letter-spacing:.12em;color:#ffd98a;
+      text-shadow:1px 1px #000;margin:0 0 12px;padding-bottom:8px;border-bottom:2px solid #444}
+    .features{list-style:none;margin:0 0 30px;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+    .features li{color:#e8e8e8;font-size:15px;text-shadow:1px 1px #000;
+      background:rgba(0,0,0,.5);border:2px solid #000;box-shadow:0 0 0 2px #4a4a4a;padding:8px 12px}
+    .features li::before{content:"\25AA";color:#5aff5a;margin-right:9px}
+    .switcher{display:flex;gap:8px;margin-bottom:14px}
+    .switcher button{font-family:MC,monospace;font-size:14px;color:#fff;text-shadow:1px 1px #3e3e3e;cursor:pointer;
+      background:#6d6d6d;border:2px solid;border-color:#a6a6a6 #383838 #383838 #a6a6a6;outline:2px solid #000;
+      padding:6px 15px 8px;transition:background .1s,border-color .1s}
+    .switcher button:hover:not(.active){background:#7c81b8;border-color:#b6bae6 #43436e #43436e #b6bae6}
+    .switcher button.active{background:#3a7a3a;border-color:#6fb06f #204020 #204020 #6fb06f}
+    .video-wrap{background:#000;border:2px solid #000;box-shadow:0 0 0 2px #4a4a4a;overflow:hidden}
+    .video-wrap video{display:block;width:100%;height:auto;max-height:80vh}
+    .credit{color:#8f8f8f;font-size:13px;text-shadow:1px 1px #000;margin-top:12px}
   </style>
 </head>
 <body>
   <main>
-    <a class="back" href="/moding">← back</a>
-    <h1>Old Factions Mod ft.imgui Menu</h1>
+    <a class="back" href="/moding">&larr; back</a>
+    <h1>Old Factions Mod ft. imgui Menu</h1>
 
-    <p class="features-heading">Features:</p>
+    <p class="features-heading">Features</p>
     <ul class="features">
       <li>Fly</li>
       <li>Tp Cords</li>
