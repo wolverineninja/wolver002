@@ -24,10 +24,14 @@ input{width:100%;font-family:MC,monospace;background:#000;border:2px solid #a0a0
   padding:9px 11px}
 input:focus{outline:none;border-color:#fff}
 input::placeholder{color:#8a8a8a}
+input+input{margin-top:10px}
 textarea{width:100%;font-family:MC,monospace;background:#000;border:2px solid #a0a0a0;color:#fff;font-size:13px;
   padding:9px 11px;min-height:92px;resize:vertical;line-height:1.6}
 textarea:focus{outline:none;border-color:#fff}
 textarea::placeholder{color:#8a8a8a}
+.who{color:#a8a8a8;font-size:11px;text-shadow:1px 1px #000;text-align:right;margin:-8px 0 16px;min-height:14px}
+.who b{color:#ffd98a}
+.who a{color:#ffd98a;cursor:pointer;text-decoration:underline}
 .btn{font-family:MC,monospace;font-size:14px;color:#fff;text-shadow:1px 1px #3e3e3e;cursor:pointer;text-decoration:none;
   background:#6d6d6d;border:2px solid;border-color:#a6a6a6 #383838 #383838 #a6a6a6;outline:2px solid #000;
   padding:5px 12px 7px;display:inline-block;transition:background .1s,border-color .1s}
@@ -77,7 +81,21 @@ textarea::placeholder{color:#8a8a8a}
 <div class=container>
 <p class=intro>Paste your Animal Company token once &mdash; it's kept warm automatically so a fresh <b>token.json</b> is always ready to grab, and it never silently expires on you.</p>
 
-<div class=card id=addCard>
+<div class=who id=who></div>
+
+<div class="card hidden" id=loginCard>
+  <label for=lu>Log in to keep a token warm</label>
+  <input id=lu type=text placeholder="Username" autocomplete=username>
+  <input id=lp type=password placeholder="Password" autocomplete=current-password>
+  <div class=row style="margin-top:14px">
+    <button class="btn go" id=loginBtn style="margin-top:0;flex:1;width:auto">Log in</button>
+    <button class="btn" id=signupBtn>Sign up</button>
+  </div>
+  <div class=msg id=lmsg></div>
+  <p class=note>A free wolver account is all you need &mdash; the same login works everywhere on wolver002.com.</p>
+</div>
+
+<div class="card hidden" id=addCard>
   <label for=paste>Your token</label>
   <textarea id=paste placeholder="Paste a full token.json, or just its refresh_token…"></textarea>
   <button class="btn go" id=go>Keep it warm</button>
@@ -115,6 +133,8 @@ var STORE='wolver_keepwarm_key';
 var FMT=(function(){try{return localStorage.getItem('wolver_keepwarm_fmt')||'nexus';}catch(e){return 'nexus';}})();
 if(FMT!=='eic')FMT='nexus';
 var KEY=(function(){try{return localStorage.getItem(STORE)||'';}catch(e){return '';}})();
+var TOKEN=(function(){try{return localStorage.getItem('rc_user_token')||'';}catch(e){return '';}})();
+var UNAME=(function(){try{return localStorage.getItem('rc_user_name')||'';}catch(e){return '';}})();
 var $=function(id){return document.getElementById(id);};
 var timer=null;
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){
@@ -157,8 +177,9 @@ $('go').onclick=async function(){
  $('go').disabled=true;m.className='msg';m.textContent='Verifying…';
  try{
   var r=await fetch(API+'/refresher/public/submit',{method:'POST',
-    headers:{'Content-Type':'application/json'},body:JSON.stringify({paste:paste})});
+    headers:{'Content-Type':'application/json','X-User-Token':TOKEN},body:JSON.stringify({paste:paste})});
   var j=await r.json().catch(function(){return {error:'HTTP '+r.status};});
+  if(r.status===401){m.className='msg bad';m.textContent='Please log in again.';$('go').disabled=false;doLogout();return;}
   if(!r.ok||!j.ok){m.className='msg bad';m.textContent=j.error||('Failed (HTTP '+r.status+')');$('go').disabled=false;return;}
   setKey(j.view_key);$('paste').value='';
   m.className='msg ok';m.textContent=j.returning?'Welcome back — your token is being kept warm.':'Done — your token is now kept warm.';
@@ -189,7 +210,49 @@ $('rm').onclick=async function(){
 $('fmtsw').addEventListener('click',function(ev){var b=ev.target.closest('[data-fmt]');if(!b)return;
  FMT=b.getAttribute('data-fmt');try{localStorage.setItem('wolver_keepwarm_fmt',FMT);}catch(e){}renderFmt();});
 
-// ── "Have a key?" — the original admin-issued per-account key downloader ──
+// ── wolver account login gate — you must be logged in to keep a token warm ──
+function deviceHwid(){
+ var parts=[navigator.userAgent||'',navigator.language||'',navigator.platform||'',
+  (navigator.hardwareConcurrency||'')+'',(navigator.deviceMemory||'')+'',
+  screen.width+'x'+screen.height+'x'+screen.colorDepth,
+  (function(){try{return Intl.DateTimeFormat().resolvedOptions().timeZone;}catch(e){return '';}})()];
+ try{var cv=document.createElement('canvas'),ctx=cv.getContext('2d');ctx.textBaseline='top';ctx.font='14px Arial';
+  ctx.fillStyle='#f60';ctx.fillRect(0,0,100,20);ctx.fillStyle='#069';ctx.fillText('wolver-hwid',2,2);parts.push(cv.toDataURL());}catch(e){}
+ return crypto.subtle.digest('SHA-256',new TextEncoder().encode(parts.join('|'))).then(function(buf){
+  return Array.from(new Uint8Array(buf)).map(function(b){return ('0'+b.toString(16)).slice(-2);}).join('');});}
+function authRequest(path,hwid){
+ var u=$('lu').value.trim(),p=$('lp').value,lm=$('lmsg');
+ if(!u||!p){lm.className='msg bad';lm.textContent='Fill in both fields.';return;}
+ lm.className='msg';lm.textContent='…';
+ var payload={username:u,password:p};if(hwid)payload.hwid=hwid;
+ fetch(API+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+  .then(function(r){return r.json();}).then(function(d){
+   if(d.error){lm.className='msg bad';lm.textContent=d.error;return;}
+   TOKEN=d.token;UNAME=d.username;
+   try{localStorage.setItem('rc_user_token',TOKEN);localStorage.setItem('rc_user_name',UNAME);}catch(e){}
+   $('lu').value='';$('lp').value='';lm.textContent='';gate();
+  }).catch(function(){lm.className='msg bad';lm.textContent='Server offline.';});}
+function doLogout(){TOKEN='';UNAME='';try{localStorage.removeItem('rc_user_token');localStorage.removeItem('rc_user_name');}catch(e){}gate();}
+function whoBar(){var w=$('who');
+ if(TOKEN&&UNAME){w.innerHTML='Logged in as <b>'+esc(UNAME)+'</b> &middot; <a id=logout>Log out</a>';
+  var lo=$('logout');if(lo)lo.onclick=doLogout;}else w.innerHTML='';}
+function gate(){whoBar();
+ if(TOKEN){$('loginCard').classList.add('hidden');if(KEY)startPolling();else showAdd();}
+ else{if(timer){clearInterval(timer);timer=null;}$('addCard').classList.add('hidden');$('dash').classList.add('hidden');$('loginCard').classList.remove('hidden');}}
+async function boot(){
+ if(TOKEN){try{var r=await fetch(API+'/account/verify',{headers:{'X-User-Token':TOKEN}});
+   var d=await r.json().catch(function(){return {};});
+   if(!r.ok||!d.ok){TOKEN='';UNAME='';try{localStorage.removeItem('rc_user_token');localStorage.removeItem('rc_user_name');}catch(e){}}
+   else if(d.user)UNAME=d.user;}catch(e){}}
+ gate();}
+$('loginBtn').onclick=function(){authRequest('/account/login');};
+$('signupBtn').onclick=function(){var lm=$('lmsg');lm.className='msg';lm.textContent='Verifying device…';
+ deviceHwid().then(function(h){authRequest('/account/signup',h);}).catch(function(){authRequest('/account/signup','');});};
+$('lp').addEventListener('keydown',function(e){if(e.key==='Enter')$('loginBtn').click();});
+window.addEventListener('storage',function(e){if(e.key==='rc_user_token'||e.key==='rc_user_name'){
+ TOKEN=localStorage.getItem('rc_user_token')||'';UNAME=localStorage.getItem('rc_user_name')||'';gate();}});
+
+// ── "Have a key?" — the original admin-issued per-account key downloader (no login) ──
 var KSTORE='wolver_refresh_key';var kgo=$('kgo'),kmsg=$('kmsg'),keyEl=$('key');
 try{keyEl.value=localStorage.getItem(KSTORE)||'';}catch(e){}
 keyEl.addEventListener('input',function(){try{localStorage.setItem(KSTORE,keyEl.value);}catch(e){}});
@@ -211,5 +274,5 @@ kgo.onclick=async function(){
 keyEl.addEventListener('keydown',function(e){if(e.key==='Enter')kgo.click();});
 
 renderFmt();
-if(KEY)startPolling();
+boot();
 </script></body></html>
