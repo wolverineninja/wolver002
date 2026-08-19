@@ -315,6 +315,25 @@ function wire() {
 
   $("#src-key").addEventListener("click", (e) => act(e.target, async () => { SOURCE = "pile"; saveState(); return await buildStatus(); }, "Using key token"));
   $("#src-personal").addEventListener("click", (e) => act(e.target, async () => { SOURCE = "personal"; if (USE_ID == null && PERSONAL.length) USE_ID = PERSONAL[0].id; saveState(); return await buildStatus(); }, "Using personal token"));
+
+  // Pull a token from whichever source the switch is on, and download it.
+  $("#btn-get").addEventListener("click", async (e) => {
+    const b = e.target, o = b.textContent; b.textContent = "Getting…";
+    await act(b, async () => {
+      if (SOURCE === "personal") {
+        const p = PERSONAL.find((x) => x.id === USE_ID) || PERSONAL[0];
+        if (!p) throw new Error("No personal token saved");
+        await download("/refresher/public/token.json", { "X-View-Key": p.view_key }, "token.json");
+      } else {
+        if (!PILE_KEY) throw new Error("Link your key first");
+        if (KEY_KIND === "account") await download("/refresher/token.json", { "X-Refresher-Key": PILE_KEY }, "token.json");
+        else await download("/refresher/public/pile.token.json", { "X-Pile-Key": PILE_KEY }, "token.json");
+      }
+      LAST_REFRESH = Math.floor(Date.now() / 1000);
+      return await buildStatus();
+    }, "Downloaded token.json");
+    b.textContent = o;
+  });
 }
 
 function startPolling() { if (poll) clearInterval(poll); poll = setInterval(refreshStatus, 4000); }
