@@ -165,9 +165,6 @@ function render(s) {
   if (s.last_error) { err.textContent = s.last_error; err.classList.remove("hidden"); }
   else err.classList.add("hidden");
 
-  $("#btn-start").disabled = s.enabled;
-  $("#btn-stop").disabled = !s.enabled;
-
   renderPersonal(s.personal, s.personal_counts);
   renderKey(s.key);
   renderCountdown();
@@ -294,8 +291,6 @@ function wire() {
     if (fn) act(btn, () => fn(Number(btn.dataset.id)));
   });
 
-  $("#btn-start").addEventListener("click", (e) => act(e.target, async () => { ENABLED = true; saveState(); startPolling(); return await buildStatus(); }, "Started"));
-  $("#btn-stop").addEventListener("click", (e) => act(e.target, async () => { ENABLED = false; saveState(); return await buildStatus(); }, "Stopped"));
 
   $("#btn-save-personal").addEventListener("click", async (e) => {
     const bearer = $("#in-bearer").value.trim(), refresh = $("#in-refresh").value.trim(), label = $("#in-label").value.trim();
