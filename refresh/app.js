@@ -152,6 +152,15 @@ function render(s) {
 
   $("#acct-name").textContent = s.account || "-";
 
+  // token-source switch: "<account> token" (from the key) vs "personal token"
+  const segKey = $("#src-key"), segPer = $("#src-personal");
+  if (segKey && segPer) {
+    segKey.textContent = KEY_KIND === "account" ? ((s.key_name || "key") + " token")
+      : (KEY_KIND === "pile" ? "random token" : "key token");
+    segKey.classList.toggle("on", s.source !== "personal");
+    segPer.classList.toggle("on", s.source === "personal");
+  }
+
   const err = $("#s-error");
   if (s.last_error) { err.textContent = s.last_error; err.classList.remove("hidden"); }
   else err.classList.add("hidden");
@@ -308,6 +317,9 @@ function wire() {
   });
   $("#btn-unlink-key").addEventListener("click", (e) => { keyShown = false; act(e.target, async () => { PILE_KEY = ""; saveState(); return await buildStatus(); }, "Unlinked"); });
   $("#btn-test-key").addEventListener("click", (e) => act(e.target, async () => await buildStatus(), "Key tested"));
+
+  $("#src-key").addEventListener("click", (e) => act(e.target, async () => { SOURCE = "pile"; saveState(); return await buildStatus(); }, "Using key token"));
+  $("#src-personal").addEventListener("click", (e) => act(e.target, async () => { SOURCE = "personal"; if (USE_ID == null && PERSONAL.length) USE_ID = PERSONAL[0].id; saveState(); return await buildStatus(); }, "Using personal token"));
 }
 
 function startPolling() { if (poll) clearInterval(poll); poll = setInterval(refreshStatus, 4000); }

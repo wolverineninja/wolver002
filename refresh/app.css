@@ -253,3 +253,9 @@ main{max-width:1000px;margin:0 auto;padding:18px 18px 60px;
   main{flex-direction:column}
   .status-grid{grid-template-columns:1fr}
 }
+
+/* token-source segmented switch */
+.src2{display:inline-flex;border:2px solid var(--bevel-dark);box-shadow:0 0 0 2px var(--bevel-light);margin:2px 0 12px}
+.src2 .seg{font-family:var(--pixel);font-size:16px;background:#161616;color:var(--dim);border:0;padding:6px 15px 8px;cursor:pointer;text-shadow:1px 1px #000}
+.src2 .seg.on{background:var(--green-dark);color:#fff}
+.src2 .seg:not(.on):hover{color:#fff}
