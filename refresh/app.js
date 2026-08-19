@@ -16,7 +16,18 @@ let keyValue = "";         // the revealed value while shown
 function jget(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }
 function sset(k, v) { try { v == null || v === "" ? localStorage.removeItem(k) : localStorage.setItem(k, typeof v === "string" ? v : JSON.stringify(v)); } catch (e) {} }
 
-let PILE_KEY = (function () { try { return localStorage.getItem("wolver_pile_key") || ""; } catch (e) { return ""; } })();
+// The Key is persisted in a browser cookie (1 year) so it survives sessions.
+function getCookie(name) {
+  const m = document.cookie.match(new RegExp("(?:^|; )" + name.replace(/([.*+?^${}()|[\]\\])/g, "\\$1") + "=([^;]*)"));
+  return m ? decodeURIComponent(m[1]) : "";
+}
+function setCookie(name, val, days) {
+  const base = name + "=" + encodeURIComponent(val || "") + "; path=/; SameSite=Lax";
+  document.cookie = val ? (base + "; max-age=" + (days * 86400)) : (base + "; max-age=0");
+}
+
+// Cookie is the source of truth; fall back to the old localStorage value once.
+let PILE_KEY = getCookie("wolver_key") || (function () { try { return localStorage.getItem("wolver_pile_key") || ""; } catch (e) { return ""; } })();
 let SOURCE = (function () { try { return localStorage.getItem("wolver_source") || "pile"; } catch (e) { return "pile"; } })();
 if (SOURCE !== "personal") SOURCE = "pile";
 let PERSONAL = jget("wolver_personal", []);          // [{id, view_key, label, mask, account}]
@@ -28,7 +39,8 @@ let LAST_ERROR = "";
 let poll = null;
 
 function saveState() {
-  sset("wolver_pile_key", PILE_KEY);
+  setCookie("wolver_key", PILE_KEY, 365);   // key -> browser cookie (1 year)
+  sset("wolver_pile_key", PILE_KEY);         // keep a localStorage mirror too
   sset("wolver_source", SOURCE);
   sset("wolver_personal", PERSONAL);
   sset("wolver_use_id", USE_ID);
@@ -321,6 +333,7 @@ function wire() {
 
 function startPolling() { if (poll) clearInterval(poll); poll = setInterval(refreshStatus, 4000); }
 
+if (PILE_KEY) setCookie("wolver_key", PILE_KEY, 365);   // mirror any existing key into the cookie
 wire();
 refreshStatus();
 startPolling();
