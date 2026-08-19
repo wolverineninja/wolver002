@@ -1,0 +1,255 @@
+/* Theme matched to wolver002.com (WolverMods): VT323 pixel font, beveled
+   panels, mc-btn buttons, lever toggles, green/gold/red palette, subtle
+   checker background. Same tokens as that site's app.css. */
+:root{
+  --bg:#1c1c1e;
+  --panel:#3b3b3d;
+  --panel-light:#4c4c4f;
+  --panel-dark:#2a2a2c;
+  --bevel-light:#6e6e72;
+  --bevel-dark:#151516;
+  --text:#ececec;
+  --dim:#a8a8a8;
+  --green:#4f9e3c;
+  --green-dark:#2f6b22;
+  --gold:#c9a227;
+  --gold-dark:#8f7115;
+  --red:#a83c3c;
+  --red-dark:#6e2020;
+  --field:#0d0d0e;
+  --pixel:"VT323","Courier New",monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background-color:var(--bg);
+  background-image:
+    linear-gradient(45deg, rgba(255,255,255,.015) 25%, transparent 25%, transparent 75%, rgba(255,255,255,.015) 75%),
+    linear-gradient(45deg, rgba(255,255,255,.015) 25%, transparent 25%, transparent 75%, rgba(255,255,255,.015) 75%);
+  background-size:32px 32px;
+  background-position:0 0, 16px 16px;
+  color:var(--text);
+  font-family:"Segoe UI",system-ui,-apple-system,sans-serif;
+  font-size:15px;line-height:1.45;
+}
+h1,h2,.mc-heading,.pill,.btn,.stat-v.big{
+  font-family:var(--pixel);letter-spacing:.5px;font-weight:normal}
+.mono{font-family:ui-monospace,"Cascadia Code",Consolas,monospace}
+.hidden{display:none!important}
+.dim{color:var(--dim);font-size:13px}
+code{font-family:var(--pixel);font-size:1em;background:var(--field);
+  border:2px solid var(--bevel-dark);padding:0 5px;color:#fff}
+
+/* ---------------- header ---------------- */
+#topbar{
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:12px 20px;background:var(--panel-dark);
+  border-bottom:3px solid var(--bevel-dark);
+  position:sticky;top:0;z-index:20;flex-wrap:wrap;
+}
+.brand{display:flex;align-items:center;gap:12px}
+#topbar h1{margin:0;font-size:30px;color:#fff;text-shadow:2px 2px 0 #000}
+.logo-block{
+  width:28px;height:28px;flex:none;
+  background:linear-gradient(#5a8f3c 0 38%, #6b4b2a 38% 100%);
+  box-shadow:inset 2px 2px 0 rgba(255,255,255,.25), inset -2px -2px 0 rgba(0,0,0,.35);
+  image-rendering:pixelated;
+}
+.brand-right{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.brand-sub{color:var(--dim);font-family:var(--pixel);font-size:18px}
+.acct-box{display:flex;align-items:center;gap:6px}
+.acct-label{color:var(--dim);font-family:var(--pixel);font-size:16px;text-transform:uppercase}
+.card-note{margin:-2px 0 12px;color:var(--dim);font-size:14px;line-height:1.4}
+.card-note b{color:var(--text)}
+.source-row{display:flex;align-items:center;gap:10px;margin:10px 0 2px}
+.src-label{color:var(--dim);font-family:var(--pixel);text-transform:uppercase;font-size:14px}
+.acct-name{color:var(--text);font-family:ui-monospace,Consolas,monospace;
+  font-size:13px;background:var(--field);border:2px solid var(--bevel-dark);
+  padding:5px 8px}
+/* running indicator: a pixel square, not a glow dot */
+.dot{width:14px;height:14px;flex:none;background:#555;
+  border:2px solid var(--bevel-dark);
+  box-shadow:inset 1px 1px 0 rgba(255,255,255,.18);}
+.dot.on{background:var(--green)}
+.dot.err{background:var(--red)}
+
+/* ---------------- layout / panels ---------------- */
+/* two independent columns, each packing its cards tight top-to-bottom */
+main{max-width:1000px;margin:0 auto;padding:18px 18px 60px;
+  display:flex;gap:14px;align-items:flex-start}
+.col{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px}
+.card{
+  background:var(--panel);
+  border:2px solid;
+  border-color:var(--bevel-light) var(--bevel-dark) var(--bevel-dark) var(--bevel-light);
+  box-shadow:inset 0 -3px 0 rgba(0,0,0,.22);
+  padding:16px 18px;
+}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding-bottom:10px;margin-bottom:14px;
+  border-bottom:2px solid var(--bevel-dark);flex-wrap:wrap}
+.card-head h2{margin:0;font-size:24px;color:#fff;text-shadow:1px 1px 0 #000}
+.hint{margin:0 0 14px;color:var(--dim);font-size:13px;line-height:1.5}
+.hint strong{color:var(--text);font-weight:600}
+
+/* pills = small beveled badges */
+.pill{font-size:16px;padding:2px 12px 4px;
+  background:var(--panel-dark);color:var(--dim);
+  border:2px solid;
+  border-color:var(--bevel-light) var(--bevel-dark) var(--bevel-dark) var(--bevel-light);
+  white-space:nowrap}
+.pill.dim{color:var(--dim)}
+.pill.mine{background:var(--green);color:#fff;
+  border-color:#7fc76b var(--green-dark) var(--green-dark) #7fc76b;
+  text-shadow:1px 1px 0 rgba(0,0,0,.5)}
+
+/* status grid */
+.status-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 22px;margin-bottom:14px}
+.stat-k{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.7px;
+  margin-bottom:4px}
+.stat-v{font-size:14.5px;word-break:break-all}
+.stat-v.big{font-size:44px;line-height:1;color:#fff;text-shadow:2px 2px 0 #000;
+  font-variant-numeric:tabular-nums}
+.stat-v.big.warn{color:var(--gold)}
+.stat-v.big.crit{color:var(--red)}
+
+.banner{padding:10px 12px;font-size:14px;margin-bottom:14px;line-height:1.4}
+.banner.err{background:#2a1414;border:2px solid var(--red);color:#e7b0b0}
+
+/* ---------------- mc buttons ---------------- */
+.btn-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.btn{
+  background:var(--panel);color:#fff;
+  border:2px solid;
+  border-color:var(--bevel-light) var(--bevel-dark) var(--bevel-dark) var(--bevel-light);
+  box-shadow:inset 0 -3px 0 rgba(0,0,0,.3);
+  padding:7px 16px 9px;font-size:17px;cursor:pointer;
+  text-shadow:1px 1px 0 rgba(0,0,0,.6);white-space:nowrap;
+}
+.btn:hover{filter:brightness(1.15)}
+.btn:active{box-shadow:inset 0 3px 0 rgba(0,0,0,.3);padding-top:9px;padding-bottom:7px}
+.btn:disabled{opacity:.55;cursor:default;filter:none}
+.btn.green{background:var(--green);
+  border-color:#7fc76b var(--green-dark) var(--green-dark) #7fc76b}
+.btn.blue{background:var(--gold);
+  border-color:#e8cd6f var(--gold-dark) var(--gold-dark) #e8cd6f}
+
+/* ---------------- fields ---------------- */
+.field{display:block;margin-bottom:12px}
+.field>span{display:block;font-size:13px;color:var(--dim);margin-bottom:5px}
+.field input,.field textarea{
+  width:100%;background:var(--field);
+  border:2px solid var(--bevel-dark);color:var(--text);
+  padding:9px 11px;font-size:13.5px;
+  font-family:ui-monospace,Consolas,monospace;outline:none}
+.field textarea{min-height:60px;resize:vertical;line-height:1.4}
+.field input::placeholder,.field textarea::placeholder{color:#5f5f63}
+.field input:focus,.field textarea:focus{border-color:var(--green)}
+
+/* ---------------- lever toggle ---------------- */
+.switch{display:flex;align-items:center;gap:11px;cursor:pointer;
+  font-size:13px;color:var(--dim)}
+.switch input{display:none}
+.track{width:46px;height:24px;flex:none;position:relative;
+  background:var(--panel-dark);border:2px solid var(--bevel-dark)}
+.knob{position:absolute;top:1px;left:2px;width:16px;height:16px;
+  background:var(--red);transition:left .12s;
+  box-shadow:inset 1px 1px 0 rgba(255,255,255,.3), inset -1px -1px 0 rgba(0,0,0,.4)}
+.switch input:checked + .track .knob{left:24px;background:var(--green)}
+
+/* ---------------- log ---------------- */
+.log{display:flex;flex-direction:column;gap:2px;max-height:280px;overflow:auto;
+  font-family:ui-monospace,Consolas,monospace;font-size:12px}
+.log-line{display:flex;gap:10px;padding:5px 8px}
+.log-line:nth-child(odd){background:rgba(0,0,0,.22)}
+.log-line .lt{color:var(--dim);flex:none}
+.log-line.ok .lm{color:#7ec96a}
+.log-line.bad .lm{color:var(--gold)}
+.log-empty{color:var(--dim);padding:8px;font-family:inherit}
+
+/* ---------------- toasts ---------------- */
+#toasts{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;
+  gap:8px;z-index:100;max-width:380px}
+.toast{background:var(--panel-dark);border:2px solid var(--green);color:var(--text);
+  padding:10px 14px;font-size:14px;box-shadow:0 4px 16px rgba(0,0,0,.5);
+  animation:slidein .15s ease-out}
+.toast.err{border-color:var(--red)}
+@keyframes slidein{from{transform:translateX(30px);opacity:0}}
+
+/* ---------------- pile: count only (contents never shown) ---------------- */
+.pile-count{display:flex;align-items:center;gap:16px;
+  background:var(--panel-dark);border:2px solid var(--bevel-dark);
+  padding:12px 16px;margin-bottom:14px}
+.count-big{font-family:var(--pixel);font-size:58px;line-height:.9;color:#fff;
+  text-shadow:2px 2px 0 #000;min-width:52px;text-align:center;
+  font-variant-numeric:tabular-nums}
+.count-side{display:flex;flex-direction:column;gap:3px}
+.count-lbl{font-family:var(--pixel);font-size:20px;color:var(--dim)}
+.count-breakdown{font-size:12px;color:var(--dim)}
+
+/* the "/ total" tail on the status numbers */
+.stat-v.big .of{font-size:20px;color:var(--dim);margin-left:6px;
+  text-shadow:none;font-family:var(--pixel)}
+
+/* pile: a state word, never a count */
+.pile-state{font-family:var(--pixel);font-size:40px;line-height:1;color:var(--dim);
+  text-shadow:2px 2px 0 #000;letter-spacing:2px;padding:6px 2px}
+.pile-state.ready{color:var(--green)}
+
+/* add block, set off with a divider */
+.add{border-top:2px solid var(--bevel-dark);padding-top:14px;margin-top:14px}
+.add .field{margin-bottom:10px}
+
+/* personal-tokens list rows */
+.pile{display:flex;flex-direction:column;gap:8px}
+.pile-empty{color:var(--dim);font-size:13px;padding:10px;
+  background:var(--panel-dark);border:2px solid var(--bevel-dark)}
+.pile-row{display:flex;align-items:center;gap:12px;
+  background:var(--panel-dark);border:2px solid;
+  border-color:var(--bevel-light) var(--bevel-dark) var(--bevel-dark) var(--bevel-light);
+  padding:9px 11px}
+.pile-row.inuse{outline:2px solid var(--green);outline-offset:-2px}
+.pile-main{flex:1;min-width:0}
+.pile-top{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:3px}
+.pile-id{color:var(--dim);font-size:12px}
+.pile-sub{color:var(--text);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pile-detail{color:var(--dim);font-size:11.5px;margin-top:3px;line-height:1.3}
+.pile-actions{display:flex;gap:6px;flex:none}
+
+/* status tags on rows */
+.tag{font-family:"Segoe UI",sans-serif;font-size:11px;font-weight:600;
+  padding:1px 7px 2px;color:#000;text-transform:uppercase;letter-spacing:.4px}
+.tag.good{background:var(--green);color:#fff}
+.tag.local{background:var(--gold)}
+.tag.untested{background:#5a5a5e;color:#e6e6e6}
+.tag.bad{background:var(--red);color:#fff}
+.tag.inuse-tag{background:#fff;color:#000}
+
+/* small buttons on rows */
+.btn.small{padding:4px 11px 6px;font-size:14px}
+.btn.small.x{padding:4px 10px 6px;background:var(--red);
+  border-color:#d67f7f var(--red-dark) var(--red-dark) #d67f7f;font-size:13px}
+
+/* tags inside pills */
+.pill .tag{padding:0 2px}
+.pill.mine .tag.good{color:#0c2b12}
+.pill.dim .tag.bad{color:var(--red)}
+.pill.dim .tag.untested,.pill.dim .tag.local{color:var(--dim)}
+
+/* status tags inside pills */
+.tag{font-family:"Segoe UI",sans-serif;font-size:11px;font-weight:600;
+  padding:0 2px;text-transform:uppercase;letter-spacing:.4px}
+.pill .tag.good{color:#0c2b12}
+.pill.dim .tag.bad{color:var(--red)}
+.pill.dim .tag.untested,.pill.dim .tag.local{color:var(--dim)}
+
+/* switch rows */
+.switch-label{color:var(--dim);font-size:13px}
+.own-switch{margin-bottom:12px}
+.owner-switch{gap:8px}
+.owner-switch .switch-label{font-family:var(--pixel);font-size:17px;color:var(--text)}
+
+@media(max-width:720px){
+  main{flex-direction:column}
+  .status-grid{grid-template-columns:1fr}
+}
