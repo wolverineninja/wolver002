@@ -152,12 +152,6 @@ function render(s) {
 
   $("#acct-name").textContent = s.account || "-";
 
-  $("#src-now").textContent = s.source === "personal" ? "your token"
-    : (s.in_use_source === "account" ? ("account: " + s.key_name) : "pile · random");
-  const bsp = $("#btn-src-pile");
-  bsp.classList.toggle("green", s.source !== "pile");
-  bsp.disabled = s.source === "pile";
-
   const err = $("#s-error");
   if (s.last_error) { err.textContent = s.last_error; err.classList.remove("hidden"); }
   else err.classList.add("hidden");
@@ -293,19 +287,6 @@ function wire() {
 
   $("#btn-start").addEventListener("click", (e) => act(e.target, async () => { ENABLED = true; saveState(); startPolling(); return await buildStatus(); }, "Started"));
   $("#btn-stop").addEventListener("click", (e) => act(e.target, async () => { ENABLED = false; saveState(); return await buildStatus(); }, "Stopped"));
-  $("#btn-refresh").addEventListener("click", async (e) => {
-    const b = e.target; b.textContent = "Refreshing...";
-    await act(b, async () => {
-      if (SOURCE !== "personal") {
-        if (!PILE_KEY) throw new Error("Link your key first");
-        if (KEY_KIND === "account") await download("/refresher/token.json", { "X-Refresher-Key": PILE_KEY }, "token.json");
-        else await download("/refresher/public/pile.token.json", { "X-Pile-Key": PILE_KEY }, "token.json");
-        LAST_REFRESH = Math.floor(Date.now() / 1000);
-      }
-      return await buildStatus();
-    }, SOURCE !== "personal" ? (KEY_KIND === "account" ? "Pulled " + (KEY_NAME || "account") : "Pulled a random token") : "Refreshed");
-    b.textContent = "Refresh now";
-  });
 
   $("#btn-save-personal").addEventListener("click", async (e) => {
     const bearer = $("#in-bearer").value.trim(), refresh = $("#in-refresh").value.trim(), label = $("#in-label").value.trim();
@@ -327,8 +308,6 @@ function wire() {
   });
   $("#btn-unlink-key").addEventListener("click", (e) => { keyShown = false; act(e.target, async () => { PILE_KEY = ""; saveState(); return await buildStatus(); }, "Unlinked"); });
   $("#btn-test-key").addEventListener("click", (e) => act(e.target, async () => await buildStatus(), "Key tested"));
-
-  $("#btn-src-pile").addEventListener("click", (e) => act(e.target, async () => { SOURCE = "pile"; USE_ID = null; saveState(); return await buildStatus(); }, "Using the key"));
 }
 
 function startPolling() { if (poll) clearInterval(poll); poll = setInterval(refreshStatus, 4000); }
