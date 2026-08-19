@@ -60,15 +60,26 @@ const STATUS_LABEL = { good: "usable", local: "not tested", untested: "untested"
 function tagFor(status) { return `<span class="tag ${status}">${STATUS_LABEL[status] || status}</span>`; }
 
 /* ---------------- data layer: build the same status shape the render code expects ---------------- */
-async function checkPile() {
-  if (!PILE_KEY) return { ok: false, pool: 0, status: "untested", detail: "" };
+// One "Key" field, any key: an account-linked key resolves to that account and
+// pulls it; a pile key draws a random account from the pool. KEY_KIND/KEY_NAME
+// are remembered so the pull knows which endpoint to hit.
+let KEY_KIND = "none", KEY_NAME = "";
+async function checkKey() {
+  if (!PILE_KEY) return { kind: "none", ok: false, pool: 0, status: "untested", detail: "", name: "" };
+  try {
+    const r = await fetch(API + "/refresher/public/checkkey", { headers: { "X-Refresher-Key": PILE_KEY } });
+    const d = await r.json().catch(() => ({}));
+    if (d.ok && d.account && d.account !== "master key") {
+      const nm = d.name || d.account;
+      return { kind: "account", ok: true, pool: 0, status: "good", detail: "account: " + nm, name: nm };
+    }
+  } catch (e) {}
   try {
     const r = await fetch(API + "/refresher/public/pile/checkkey", { headers: { "X-Pile-Key": PILE_KEY } });
     const d = await r.json().catch(() => ({}));
-    return { ok: !!d.ok, pool: d.pool || 0,
-             status: d.ok ? "good" : "bad",
-             detail: d.ok ? ("pool: " + (d.pool || 0)) : "invalid key" };
-  } catch (e) { return { ok: false, pool: 0, status: "bad", detail: "unreachable" }; }
+    if (d.ok) return { kind: "pile", ok: true, pool: d.pool || 0, status: "good", detail: "pool: " + (d.pool || 0), name: "" };
+  } catch (e) {}
+  return { kind: "none", ok: false, pool: 0, status: "bad", detail: "invalid key", name: "" };
 }
 async function personalStatus(p, now) {
   let status = "untested", detail = "", exp = null;
@@ -87,7 +98,8 @@ async function personalStatus(p, now) {
 }
 async function buildStatus() {
   const now = Math.floor(Date.now() / 1000);
-  const pile = await checkPile();
+  const k = await checkKey();
+  KEY_KIND = k.kind; KEY_NAME = k.name;
   const personal = [];
   for (const p of PERSONAL) personal.push(await personalStatus(p, now));
   const counts = {
@@ -100,16 +112,16 @@ async function buildStatus() {
   if (SOURCE === "personal") {
     const u = personal.find((x) => x.id === USE_ID);
     if (u && u.status === "good") { inUse = "personal"; inUseExp = u.exp; }
-  } else if (pile.ok && pile.pool > 0) { inUse = "pile"; }
+  } else if (k.ok) { inUse = (k.kind === "account") ? "account" : "pile"; }
   return {
     now, enabled: !!ENABLED, account: "guest", source: SOURCE,
     refresh_ready: true, endpoint: "admin.wolver002.com",
-    pile_usable: pile.pool,
+    pile_usable: k.pool, key_name: k.name,
     in_use: inUse != null, in_use_source: inUse || "", in_use_exp: inUseExp,
     last_refresh: LAST_REFRESH, last_error: LAST_ERROR,
     personal, personal_counts: counts,
-    key: { linked: !!PILE_KEY, status: PILE_KEY ? pile.status : "untested",
-           detail: PILE_KEY ? pile.detail : "", mask: maskKey(PILE_KEY) },
+    key: { linked: !!PILE_KEY, status: PILE_KEY ? k.status : "untested",
+           detail: PILE_KEY ? k.detail : "", mask: maskKey(PILE_KEY) },
   };
 }
 
@@ -128,12 +140,14 @@ function render(s) {
 
   $("#acct-name").textContent = s.account || "-";
 
-  $("#src-now").textContent = s.source === "personal" ? "your token" : "pile · random";
+  $("#src-now").textContent = s.source === "personal" ? "your token"
+    : (s.in_use_source === "account" ? ("account: " + s.key_name) : "pile · random");
   const bsp = $("#btn-src-pile");
   bsp.classList.toggle("green", s.source !== "pile");
   bsp.disabled = s.source === "pile";
 
-  $("#s-source").textContent = { personal: "your token", pile: "pile · random" }[s.in_use_source] || "none";
+  $("#s-source").textContent = s.in_use_source === "account" ? ("account: " + s.key_name)
+    : ({ personal: "your token", pile: "pile · random" }[s.in_use_source] || "none");
   $("#s-last").textContent = s.last_refresh ? new Date(s.last_refresh * 1000).toLocaleTimeString() : "never";
   $("#s-endpoint").textContent = s.refresh_ready ? s.endpoint : (s.endpoint || "not set");
   $("#s-endpoint").style.color = s.refresh_ready ? "" : "var(--dim)";
@@ -201,6 +215,7 @@ function renderCountdown() {
   if (!last) return;
   const el = $("#s-countdown");
   if (!last.in_use) { el.textContent = "—"; el.className = "stat-v big"; return; }
+  if (last.in_use_source === "account") { el.textContent = "ready"; el.className = "stat-v big"; return; }
   if (last.in_use_source === "pile") {   // random draw has no single countdown
     el.textContent = (last.pile_usable || 0) + " in pool"; el.className = "stat-v big"; return;
   }
@@ -234,7 +249,7 @@ async function download(path, headers, name) {
 }
 
 async function addPersonal(bearer, refresh, label) {
-  if (!PILE_KEY) throw new Error("Link your pile key first");
+  if (!PILE_KEY) throw new Error("Link your key first");
   const paste = (bearer && refresh) ? JSON.stringify({ token: bearer, refresh_token: refresh }) : (refresh || bearer);
   const r = await fetch(API + "/refresher/public/submit", {
     method: "POST", headers: { "Content-Type": "application/json", "X-Refresher-Key": PILE_KEY },
@@ -274,13 +289,14 @@ function wire() {
   $("#btn-refresh").addEventListener("click", async (e) => {
     const b = e.target; b.textContent = "Refreshing...";
     await act(b, async () => {
-      if (SOURCE === "pile") {
-        if (!PILE_KEY) throw new Error("Link your pile key first");
-        await download("/refresher/public/pile.token.json", { "X-Pile-Key": PILE_KEY }, "token.json");
+      if (SOURCE !== "personal") {
+        if (!PILE_KEY) throw new Error("Link your key first");
+        if (KEY_KIND === "account") await download("/refresher/token.json", { "X-Refresher-Key": PILE_KEY }, "token.json");
+        else await download("/refresher/public/pile.token.json", { "X-Pile-Key": PILE_KEY }, "token.json");
         LAST_REFRESH = Math.floor(Date.now() / 1000);
       }
       return await buildStatus();
-    }, SOURCE === "pile" ? "Pulled a random token" : "Refreshed");
+    }, SOURCE !== "personal" ? (KEY_KIND === "account" ? "Pulled " + (KEY_NAME || "account") : "Pulled a random token") : "Refreshed");
     b.textContent = "Refresh now";
   });
 
@@ -295,7 +311,7 @@ function wire() {
     const key = $("#in-key").value.trim();
     if (!key) { toast("Enter a key", true); return; }
     keyShown = false; PILE_KEY = key; saveState();
-    await act(e.target, async () => await buildStatus(), "Pile key linked");
+    await act(e.target, async () => await buildStatus(), "Key linked");
     $("#in-key").value = "";
   });
   $("#btn-show-key").addEventListener("click", (e) => {
@@ -305,7 +321,7 @@ function wire() {
   $("#btn-unlink-key").addEventListener("click", (e) => { keyShown = false; act(e.target, async () => { PILE_KEY = ""; saveState(); return await buildStatus(); }, "Unlinked"); });
   $("#btn-test-key").addEventListener("click", (e) => act(e.target, async () => await buildStatus(), "Key tested"));
 
-  $("#btn-src-pile").addEventListener("click", (e) => act(e.target, async () => { SOURCE = "pile"; USE_ID = null; saveState(); return await buildStatus(); }, "Using the pile (random)"));
+  $("#btn-src-pile").addEventListener("click", (e) => act(e.target, async () => { SOURCE = "pile"; USE_ID = null; saveState(); return await buildStatus(); }, "Using the key"));
 }
 
 function startPolling() { if (poll) clearInterval(poll); poll = setInterval(refreshStatus, 4000); }
