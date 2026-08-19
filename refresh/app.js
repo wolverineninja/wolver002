@@ -146,12 +146,6 @@ function render(s) {
   bsp.classList.toggle("green", s.source !== "pile");
   bsp.disabled = s.source === "pile";
 
-  $("#s-source").textContent = s.in_use_source === "account" ? ("account: " + s.key_name)
-    : ({ personal: "your token", pile: "pile · random" }[s.in_use_source] || "none");
-  $("#s-last").textContent = s.last_refresh ? new Date(s.last_refresh * 1000).toLocaleTimeString() : "never";
-  $("#s-endpoint").textContent = s.refresh_ready ? s.endpoint : (s.endpoint || "not set");
-  $("#s-endpoint").style.color = s.refresh_ready ? "" : "var(--dim)";
-
   const err = $("#s-error");
   if (s.last_error) { err.textContent = s.last_error; err.classList.remove("hidden"); }
   else err.classList.add("hidden");
@@ -214,6 +208,7 @@ function renderKey(k) {
 function renderCountdown() {
   if (!last) return;
   const el = $("#s-countdown");
+  if (!el) return;   // Status readouts removed from the page
   if (!last.in_use) { el.textContent = "—"; el.className = "stat-v big"; return; }
   if (last.in_use_source === "account") { el.textContent = "ready"; el.className = "stat-v big"; return; }
   if (last.in_use_source === "pile") {   // random draw has no single countdown
