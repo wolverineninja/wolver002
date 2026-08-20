@@ -106,7 +106,7 @@ async function personalStatus(p, now) {
     }
   } catch (e) { status = "untested"; detail = "unreachable"; }
   return { id: p.id, label: p.label || "", status, detail, mask: p.mask || "",
-           has_refresh: true, exp, in_use: p.id === USE_ID };
+           has_refresh: true, exp, in_use: p.id === USE_ID, view_key: p.view_key || "" };
 }
 async function buildStatus() {
   const now = Math.floor(Date.now() / 1000);
@@ -197,6 +197,7 @@ function renderPersonal(list, counts) {
        <div class="pile-actions">
          <button class="btn small" data-act="test-personal" data-id="${t.id}">Test</button>
          ${useBtn}
+         <button class="btn small" data-vk="${esc(t.view_key || "")}" ${t.view_key ? "" : "disabled"} title="Copy this token's mod key">Key</button>
          <button class="btn small x" data-act="rm-personal" data-id="${t.id}">✕</button>
        </div>`;
     box.appendChild(row);
@@ -289,6 +290,16 @@ function wire() {
     if (!btn) return;
     const fn = ACTIONS[btn.dataset.act];
     if (fn) act(btn, () => fn(Number(btn.dataset.id)));
+  });
+
+  // Copy a personal token's mod key (its view key) so it can go in the mod's refresher.key
+  document.addEventListener("click", async (ev) => {
+    const kb = ev.target.closest("[data-vk]");
+    if (!kb) return;
+    const vk = kb.getAttribute("data-vk");
+    if (!vk) return;
+    try { await navigator.clipboard.writeText(vk); const o = kb.textContent; kb.textContent = "Copied"; setTimeout(() => (kb.textContent = o), 1200); }
+    catch (e) { window.prompt("Your mod key:", vk); }
   });
 
 
