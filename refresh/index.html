@@ -8,6 +8,15 @@
 <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="app.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%235a8f3c'/><rect y='10' width='16' height='6' fill='%236b4b2a'/></svg>">
+<style>
+  .dc-user{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .dc-avatar{width:34px;height:34px;border-radius:6px;image-rendering:auto;border:2px solid #3a3128}
+  .dc-avatar.hidden{display:none}
+  .dc-name{font-size:20px}
+  .btn.discord{background:#5865F2;border-color:#4752c4;color:#fff}
+  .btn.discord:hover{background:#6b76f6}
+  .dc-hint{margin:0 0 10px;opacity:.7}
+</style>
 </head>
 <body>
 
@@ -45,20 +54,33 @@
       <div id="s-error" class="banner err hidden"></div>
     </section>
 
-    <!-- KEY (pile key -> random pull; account key -> that account) -->
+    <!-- DISCORD -> KEY (link Discord, then generate your key) -->
     <section class="card">
       <div class="card-head">
-        <h2>Key</h2>
+        <h2>Your key</h2>
         <span id="key-pill" class="pill dim">not linked</span>
       </div>
-      <label class="field"><span>Key</span>
-        <input id="in-key" type="text" spellcheck="false" placeholder="XXXXXX-XXXXXX-XXXXXX-..."></label>
-      <div class="btn-row">
-        <button id="btn-link-key" class="btn green">Link key</button>
-        <button id="btn-test-key" class="btn">Test</button>
-        <button id="btn-show-key" class="btn">Show key</button>
-        <button id="btn-unlink-key" class="btn">Unlink</button>
-        <span id="key-state" class="dim"></span>
+
+      <div id="discord-in">
+        <p class="dc-hint">Link your Discord, then generate your key.</p>
+        <div class="btn-row">
+          <button id="btn-discord" class="btn discord">Link Discord</button>
+        </div>
+      </div>
+
+      <div id="discord-out" class="hidden">
+        <div class="dc-user">
+          <img id="dc-avatar" class="dc-avatar hidden" alt="">
+          <span id="dc-name" class="dc-name">-</span>
+        </div>
+        <label class="field"><span>Key</span>
+          <input id="in-key" type="text" spellcheck="false" readonly placeholder="generate your key →"></label>
+        <div class="btn-row">
+          <button id="btn-gen-key" class="btn green">Generate key</button>
+          <button id="btn-copy-key" class="btn hidden">Copy key</button>
+          <button id="btn-logout" class="btn">Unlink Discord</button>
+          <span id="key-state" class="dim"></span>
+        </div>
       </div>
     </section>
 

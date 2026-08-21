@@ -38,6 +38,21 @@ let LAST_REFRESH = 0;
 let LAST_ERROR = "";
 let poll = null;
 
+// Discord link: a stateless signed session token, handed back in the URL
+// fragment after OAuth, then sent as X-Session. The key is minted server-side
+// and tied to the Discord account.
+let SESSION = (function () { try { return localStorage.getItem("wolver_session") || ""; } catch (e) { return ""; } })();
+let DISCORD = null;   // {discord_id, username, name, avatar, key} once loaded
+
+// Absorb a session (or error) the callback appended to the URL, then clean it off.
+(function absorbHash() {
+  const h = location.hash || "";
+  const m = h.match(/[#&]dsession=([^&]+)/);
+  if (m) { SESSION = decodeURIComponent(m[1]); try { localStorage.setItem("wolver_session", SESSION); } catch (e) {} }
+  if (/[#&]derror=/.test(h)) setTimeout(() => toast("Discord link failed — try again", true), 300);
+  if (m || /[#&]derror=/.test(h)) history.replaceState(null, "", location.pathname + location.search);
+})();
+
 function saveState() {
   setCookie("wolver_key", PILE_KEY, 365);   // key -> browser cookie (1 year)
   sset("wolver_pile_key", PILE_KEY);         // keep a localStorage mirror too
@@ -70,6 +85,26 @@ function fmtDur(sec) {
 }
 const STATUS_LABEL = { good: "usable", local: "not tested", untested: "untested", bad: "failed" };
 function tagFor(status) { return `<span class="tag ${status}">${STATUS_LABEL[status] || status}</span>`; }
+
+/* ---------------- Discord identity + key minting ---------------- */
+async function loadDiscord() {
+  if (!SESSION) { DISCORD = null; return; }
+  try {
+    const r = await fetch(API + "/refresher/me", { headers: { "X-Session": SESSION } });
+    if (r.status === 401) { DISCORD = null; SESSION = ""; try { localStorage.removeItem("wolver_session"); } catch (e) {} return; }
+    if (!r.ok) return;                       // transient: keep whatever we had
+    const d = await r.json();
+    DISCORD = d;
+    if (d.key) { PILE_KEY = d.key; saveState(); }   // the minted key drives the mod pull + status
+  } catch (e) { /* keep last */ }
+}
+async function genKey() {
+  if (!SESSION) throw new Error("Link your Discord first");
+  const r = await fetch(API + "/refresher/key/mine", { method: "POST", headers: { "X-Session": SESSION } });
+  const j = await r.json().catch(() => ({ error: "HTTP " + r.status }));
+  if (!r.ok || !j.key) throw new Error(j.error || ("HTTP " + r.status));
+  PILE_KEY = j.key; if (DISCORD) DISCORD.key = j.key; saveState();
+}
 
 /* ---------------- data layer: build the same status shape the render code expects ---------------- */
 // One "Key" field, any key: an account-linked key resolves to that account and
@@ -206,16 +241,30 @@ function renderPersonal(list, counts) {
 
 function renderKey(k) {
   const pill = $("#key-pill");
-  pill.innerHTML = k.linked ? tagFor(k.status) : "not linked";
-  pill.classList.toggle("mine", k.status === "good" || (k.linked && k.status === "local"));
-  pill.classList.toggle("dim", !k.linked);
-  if (!k.linked) { keyShown = false; $("#btn-show-key").textContent = "Show key"; }
-  $("#btn-show-key").disabled = !k.linked;
-  if (keyShown && k.linked) {
-    $("#key-state").textContent = keyValue;   // full key, revealed
-  } else {
-    $("#key-state").textContent = k.linked ? `${k.mask}${k.detail ? " · " + k.detail : ""}` : "no key linked";
+  const inBox = $("#discord-in"), outBox = $("#discord-out");
+
+  if (!DISCORD) {
+    inBox.classList.remove("hidden"); outBox.classList.add("hidden");
+    pill.innerHTML = "not linked";
+    pill.classList.remove("mine"); pill.classList.add("dim");
+    return;
   }
+
+  inBox.classList.add("hidden"); outBox.classList.remove("hidden");
+  $("#dc-name").textContent = DISCORD.name || DISCORD.username || "linked";
+  const av = $("#dc-avatar");
+  if (DISCORD.avatar) { av.src = DISCORD.avatar; av.classList.remove("hidden"); }
+  else av.classList.add("hidden");
+
+  const hasKey = !!DISCORD.key;
+  $("#in-key").value = hasKey ? DISCORD.key : "";
+  $("#btn-gen-key").classList.toggle("hidden", hasKey);
+  $("#btn-copy-key").classList.toggle("hidden", !hasKey);
+
+  pill.innerHTML = hasKey ? tagFor(k.status) : "no key yet";
+  pill.classList.toggle("mine", hasKey && (k.status === "good" || k.status === "local"));
+  pill.classList.toggle("dim", !hasKey);
+  $("#key-state").textContent = hasKey ? (k.detail || "ready") : "generate your key";
 }
 
 function renderCountdown() {
@@ -310,19 +359,25 @@ function wire() {
     $("#in-bearer").value = ""; $("#in-refresh").value = ""; $("#in-label").value = "";
   });
 
-  $("#btn-link-key").addEventListener("click", async (e) => {
-    const key = $("#in-key").value.trim();
-    if (!key) { toast("Enter a key", true); return; }
-    keyShown = false; PILE_KEY = key; saveState();
-    await act(e.target, async () => await buildStatus(), "Key linked");
-    $("#in-key").value = "";
+  // Link Discord: send the user to the API's OAuth start with a return URL (no hash/query).
+  $("#btn-discord").addEventListener("click", () => {
+    const ret = location.origin + location.pathname;
+    location.href = API + "/refresher/discord/login?return=" + encodeURIComponent(ret);
   });
-  $("#btn-show-key").addEventListener("click", (e) => {
-    if (keyShown) { keyShown = false; keyValue = ""; e.target.textContent = "Show key"; if (last) renderKey(last.key); return; }
-    keyValue = PILE_KEY || ""; keyShown = true; e.target.textContent = "Hide"; if (last) renderKey(last.key);
+  $("#btn-gen-key").addEventListener("click", (e) =>
+    act(e.target, async () => { await genKey(); return await buildStatus(); }, "Key generated"));
+  $("#btn-copy-key").addEventListener("click", async () => {
+    const key = (DISCORD && DISCORD.key) || PILE_KEY;
+    if (!key) return;
+    try { await navigator.clipboard.writeText(key); toast("Key copied"); }
+    catch (e) { window.prompt("Your key:", key); }
   });
-  $("#btn-unlink-key").addEventListener("click", (e) => { keyShown = false; act(e.target, async () => { PILE_KEY = ""; saveState(); return await buildStatus(); }, "Unlinked"); });
-  $("#btn-test-key").addEventListener("click", (e) => act(e.target, async () => await buildStatus(), "Key tested"));
+  $("#btn-logout").addEventListener("click", (e) => act(e.target, async () => {
+    try { await fetch(API + "/refresher/logout", { method: "POST", headers: { "X-Session": SESSION } }); } catch (_) {}
+    SESSION = ""; DISCORD = null; try { localStorage.removeItem("wolver_session"); } catch (_) {}
+    PILE_KEY = ""; saveState();
+    return await buildStatus();
+  }, "Unlinked Discord"));
 
   $("#src-key").addEventListener("click", (e) => act(e.target, async () => { SOURCE = "pile"; saveState(); return await buildStatus(); }, "Using key token"));
   $("#src-personal").addEventListener("click", (e) => act(e.target, async () => { SOURCE = "personal"; if (USE_ID == null && PERSONAL.length) USE_ID = PERSONAL[0].id; saveState(); return await buildStatus(); }, "Using personal token"));
@@ -349,8 +404,12 @@ function wire() {
 
 function startPolling() { if (poll) clearInterval(poll); poll = setInterval(refreshStatus, 4000); }
 
-if (PILE_KEY) setCookie("wolver_key", PILE_KEY, 365);   // mirror any existing key into the cookie
+async function boot() {
+  await loadDiscord();               // resolve Discord identity + key once at start
+  if (PILE_KEY) setCookie("wolver_key", PILE_KEY, 365);
+  await refreshStatus();
+  startPolling();
+}
 wire();
-refreshStatus();
-startPolling();
+boot();
 setInterval(renderCountdown, 1000);
