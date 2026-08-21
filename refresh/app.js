@@ -282,7 +282,18 @@ function renderKey(k) {
     return;
   }
 
-  const hasKey = !!ACCOUNT.key;                     // linked
+  if (!ACCOUNT.supporter) {                          // linked, but no supp role
+    pill.innerHTML = "not a supporter";
+    pill.classList.remove("mine"); pill.classList.add("dim");
+    $("#in-key").value = "";
+    $("#btn-gen-key").classList.add("hidden");
+    $("#btn-show-key").classList.add("hidden");
+    $("#btn-copy-key").classList.add("hidden");
+    $("#key-state").textContent = "you need the supp role in the Discord server";
+    return;
+  }
+
+  const hasKey = !!ACCOUNT.key;                     // linked + supporter
   $("#in-key").value = hasKey ? (keyShown ? ACCOUNT.key : maskKey(ACCOUNT.key)) : "";
   $("#btn-gen-key").classList.toggle("hidden", hasKey);
   $("#btn-show-key").classList.toggle("hidden", !hasKey);
