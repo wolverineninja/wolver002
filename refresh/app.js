@@ -283,8 +283,10 @@ function renderKey(k) {
   }
 
   const hasKey = !!ACCOUNT.key;                     // linked
-  $("#in-key").value = hasKey ? ACCOUNT.key : "";
+  $("#in-key").value = hasKey ? (keyShown ? ACCOUNT.key : maskKey(ACCOUNT.key)) : "";
   $("#btn-gen-key").classList.toggle("hidden", hasKey);
+  $("#btn-show-key").classList.toggle("hidden", !hasKey);
+  $("#btn-show-key").textContent = keyShown ? "Hide" : "Show";
   $("#btn-copy-key").classList.toggle("hidden", !hasKey);
   pill.innerHTML = hasKey ? tagFor(k.status) : "no key yet";
   pill.classList.toggle("mine", hasKey && (k.status === "good" || k.status === "local"));
@@ -402,7 +404,8 @@ function wire() {
     location.href = API + "/refresher/discord/login?return=" + encodeURIComponent(ret) + "&s=" + encodeURIComponent(SESSION);
   });
   $("#btn-gen-key").addEventListener("click", (e) =>
-    act(e.target, async () => { await genKey(); return await buildStatus(); }, "Key generated"));
+    act(e.target, async () => { keyShown = false; await genKey(); return await buildStatus(); }, "Key generated"));
+  $("#btn-show-key").addEventListener("click", () => { keyShown = !keyShown; if (last) renderKey(last.key); });
   $("#btn-copy-key").addEventListener("click", async () => {
     const key = (ACCOUNT && ACCOUNT.key) || PILE_KEY;
     if (!key) return;
