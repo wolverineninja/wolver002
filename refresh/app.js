@@ -429,6 +429,15 @@ function wire() {
     PILE_KEY = ""; saveState();
     return await buildStatus();
   }, "Logged out"));
+  $("#btn-delacct").addEventListener("click", (e) => {
+    if (!confirm("Delete your account? Your key is revoked and this can't be undone.")) return;
+    act(e.target, async () => {
+      try { await fetch(API + "/refresher/account/delete-self", { method: "POST", headers: { "X-Session": SESSION } }); } catch (_) {}
+      setSession(""); ACCOUNT = null;
+      PILE_KEY = ""; saveState();
+      return await buildStatus();
+    }, "Account deleted");
+  });
 
   $("#src-key").addEventListener("click", (e) => act(e.target, async () => { SOURCE = "pile"; saveState(); return await buildStatus(); }, "Using key token"));
   $("#src-personal").addEventListener("click", (e) => act(e.target, async () => { SOURCE = "personal"; if (USE_ID == null && PERSONAL.length) USE_ID = PERSONAL[0].id; saveState(); return await buildStatus(); }, "Using personal token"));
