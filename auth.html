@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Link headset</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/refresh/app.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%235a8f3c'/><rect y='10' width='16' height='6' fill='%236b4b2a'/></svg>">
+<style>
+  main{display:block;max-width:460px;padding-top:40px}
+  .field input#code{font-family:var(--pixel);font-size:38px;letter-spacing:8px;text-align:center;text-transform:uppercase;padding:8px 11px 10px}
+  .msg{margin:0 0 14px}
+  .btn.discord{background:#5865F2;border-color:#8a94f7 #3c45a5 #3c45a5 #8a94f7;color:#fff}
+  .btn-row .btn{flex:1}
+</style>
+</head>
+<body>
+
+<header id="topbar">
+  <div class="brand">
+    <span class="logo-block"></span>
+    <h1>LINK HEADSET</h1>
+  </div>
+</header>
+
+<main>
+  <section class="card">
+    <div class="card-head">
+      <h2 id="title">Enter your code</h2>
+    </div>
+    <div id="form">
+      <p class="msg">Type the code shown in the menu, then sign in with Discord.</p>
+      <label class="field">
+        <input id="code" type="text" maxlength="7" spellcheck="false" autocomplete="off" autocapitalize="characters" placeholder="ABC-DEF">
+      </label>
+      <div id="err" class="banner err hidden"></div>
+      <div class="btn-row">
+        <button id="go" class="btn discord">Continue with Discord</button>
+      </div>
+    </div>
+    <div id="done" class="hidden">
+      <p id="text" class="msg"></p>
+      <div class="btn-row">
+        <button id="again" class="btn green hidden">Try again</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+"use strict";
+
+const API = "https://admin.wolver002.com/slaplab/";
+const KEY = "sl_auth";
+const $ = (id) => document.getElementById(id);
+
+const MSG = {
+  code: "That code is not on any headset right now. Check it and try again.",
+  slow: "Too many tries. Wait a few minutes.",
+  setup: "Linking is not set up yet."
+};
+
+const DONE = {
+  ok: ["Linked", "Signed in as @. Put the headset back on, the menu unlocks by itself."],
+  norole: ["Linked, no role yet", "Signed in as @. You don't have the role in the server yet. The menu unlocks by itself once you get it."],
+  cancel: ["Not linked", "Discord sign in was cancelled."],
+  state: ["Not linked", "That link ran out. Start again with the code on your headset."],
+  slow: ["Not linked", "Too many tries. Wait a few minutes."],
+  code: ["Not linked", "That headset is already linked or its code ran out."],
+  discord: ["Not linked", "Discord did not answer. Try again in a minute."],
+  setup: ["Not linked", "Linking is not set up yet."],
+  net: ["Not linked", "Could not reach the server. Try again in a minute."]
+};
+
+function load() {
+  try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; }
+}
+
+function store(v) {
+  try { localStorage.setItem(KEY, JSON.stringify(v)); return true; } catch (e) { return false; }
+}
+
+function post(path, data) {
+  return fetch(API + path, { method: "POST", body: new URLSearchParams(data) }).then((r) => r.json());
+}
+
+function pane(done) {
+  $("form").classList.toggle("hidden", done);
+  $("done").classList.toggle("hidden", !done);
+}
+
+function show(res, name) {
+  const d = DONE[res] || DONE.net;
+  pane(true);
+  $("title").textContent = d[0];
+  $("text").textContent = d[1].replace("@", name || "you");
+  $("again").classList.toggle("hidden", res === "ok" || res === "norole");
+}
+
+function fail(text) {
+  $("err").textContent = text;
+  $("err").classList.remove("hidden");
+  $("go").disabled = false;
+}
+
+function go() {
+  const code = $("code").value.trim();
+  if (!code) return $("code").focus();
+  $("go").disabled = true;
+  $("err").classList.add("hidden");
+  post("start", { code: code }).then((j) => {
+    if (!j.url || j.url.indexOf("https://discord.com/") !== 0) return fail(MSG[j.error] || "Something went wrong. Try again.");
+    const state = new URL(j.url).searchParams.get("state");
+    const now = Date.now(), all = load();
+    Object.keys(all).forEach((k) => { if (now - all[k].t > 900000) delete all[k]; });
+    all[state] = { n: j.nonce, t: now };
+    if (!store(all)) return fail("Your browser is blocking storage for this page.");
+    location.href = j.url;
+  }).catch(() => fail("Could not reach the server. Try again in a minute."));
+}
+
+function back() {
+  const q = new URLSearchParams(location.search);
+  const state = q.get("state"), grant = q.get("code");
+  if (!state && !q.get("error")) return;
+  history.replaceState(null, "", location.pathname);
+  const all = load(), hit = state ? all[state] : null;
+  if (hit) { delete all[state]; store(all); }
+  if (!grant) return show("cancel");
+  if (!hit) return show("state");
+  pane(true);
+  $("title").textContent = "Linking...";
+  post("finish", { state: state, code: grant, nonce: hit.n })
+    .then((j) => show(j.result, j.name))
+    .catch(() => show("net"));
+}
+
+$("go").onclick = go;
+$("code").onkeydown = (e) => { if (e.key === "Enter") go(); };
+$("again").onclick = () => {
+  pane(false);
+  $("title").textContent = "Enter your code";
+  $("go").disabled = false;
+  $("code").value = "";
+  $("code").focus();
+};
+back();
+</script>
+</body>
+</html>
