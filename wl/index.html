@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>wolver002 whitelist</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0e0e10;color:#dcdcdc;font:14px/1.4 Consolas,"DejaVu Sans Mono",monospace}
+.win{width:min(340px,92vw);background:#151517;border:1px solid #3a3a44}
+.bar{background:#29417a;color:#fff;padding:5px 9px;font-size:13px}
+form{padding:12px;display:grid;gap:10px}
+label{font-size:12px;color:#9a9aa6}
+input[type=text]{width:100%;margin-top:4px;padding:7px 8px;background:#1f2a45;border:1px solid #1f2a45;color:#fff;font:inherit;outline:0}
+input[type=text]:focus{border-color:#4a7be0}
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.tabs input{position:absolute;opacity:0}
+.tabs span{display:block;text-align:center;padding:6px;background:#23232a;cursor:pointer;user-select:none}
+.tabs input:checked+span{background:#3566c9;color:#fff}
+.tabs input:focus-visible+span{outline:1px solid #fff}
+button{padding:8px;background:#3566c9;border:0;color:#fff;font:inherit;cursor:pointer}
+button:hover{background:#4a7be0}
+button:disabled{background:#2a2a33;color:#777;cursor:default}
+#out{min-height:20px;margin:0;font-size:13px}
+#out.ok{color:#5fd97a}
+#out.no{color:#ff6b6b}
+</style>
+</head>
+<body>
+<main class="win">
+  <div class="bar">Whitelist</div>
+  <form id="f">
+    <div class="tabs" role="radiogroup" aria-label="Edition">
+      <label><input type="radio" name="kind" value="java" checked><span>Java</span></label>
+      <label><input type="radio" name="kind" value="bedrock"><span>Bedrock</span></label>
+    </div>
+    <label for="n">Username
+      <input id="n" type="text" maxlength="17" autocomplete="off" autocapitalize="off" spellcheck="false" required>
+    </label>
+    <button id="b" type="submit">Add me</button>
+    <p id="out" role="status" aria-live="polite"></p>
+  </form>
+</main>
+<script>
+const API = location.protocol === 'https:' && location.hostname !== 'wl.wolver002.com' ? 'https://wl.wolver002.com' : '';
+const f = document.getElementById('f'), b = document.getElementById('b'), out = document.getElementById('out');
+const say = (ok, msg) => { out.className = ok ? 'ok' : 'no'; out.textContent = msg; };
+f.addEventListener('submit', async e => {
+  e.preventDefault();
+  b.disabled = true;
+  say(true, '...');
+  try {
+    const r = await fetch(API + '/api/add', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name: f.n.value, kind: f.kind.value})
+    });
+    const j = await r.json();
+    say(j.ok, j.msg);
+  } catch (err) {
+    say(false, "Can't reach server.");
+  }
+  b.disabled = false;
+});
+</script>
+</body>
+</html>
